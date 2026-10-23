@@ -9,12 +9,10 @@ and templates.
 """
 
 import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 import elabapi_python as ep
 from functools import wraps
 from .experiment import ElabExperiment
+from .resource import ElabResource
 from .exceptions import (
     InvalidTemplate,
     InvalidTitle,
@@ -23,6 +21,8 @@ from .exceptions import (
     InvalidCategory,
 )
 from typing import Optional, Union
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class ElabClient:
@@ -47,13 +47,17 @@ class ElabClient:
 
         # Load useful API objects
         self.experiments = ep.ExperimentsApi(self.api_client)
+        self.items = ep.ItemsApi(self.api_client)
         self.uploads = ep.UploadsApi(self.api_client)
         self.steps = ep.StepsApi(self.api_client)
         self.comments = ep.CommentsApi(self.api_client)
         self.categories = ep.ExperimentsCategoriesApi(self.api_client)
         self.statuses = ep.ExperimentsStatusApi(self.api_client)
+        self.resource_statuses = ep.ResourcesStatusApi(self.api_client)
         self.templates = ep.ExperimentsTemplatesApi(self.api_client)
         self.tags = ep.TagsApi(self.api_client)
+        self.item_links = ep.LinksToItemsApi(self.api_client)
+        self.experiment_links = ep.LinksToExperimentsApi(self.api_client)
         self._team_id: int | None = None
 
     def download_upload(
@@ -105,17 +109,59 @@ class ElabClient:
             InvalidTitle: When title is provided but does not exist.
             InvalidID: When ID is provided but does not exist.
         """
-        # Loads Experiment object from ID or title
-        experiments_map = self.experiments_dict
         if title is not None:
+            experiments_map = self.experiments_dict
             resolved = experiments_map.get(title)
             if resolved is None:
                 raise InvalidTitle(title)
             ID = resolved
         if ID is not None:
-            if ID in experiments_map.values():
-                return ElabExperiment(self, ID=ID)
-            raise InvalidID(ID)
+            experiment = ElabExperiment(self, ID=ID)
+            try:
+                experiment.refresh()
+            except ep.rest.ApiException as exc:
+                if exc.status == 404:
+                    raise InvalidID(ID) from exc
+                raise
+            return experiment
+        raise InvalidID(ID)
+
+    def create_resource(self, title: str, category: int | None = None) -> ElabResource:
+        """Create an eLabFTW resource/item.
+
+        Resource categories are installation-specific, so ``category`` is a
+        numeric eLabFTW category ID.
+        """
+        body = {}
+        if category is not None:
+            body["category_id"] = int(category)
+        _, _, headers = self.items.post_item_with_http_info(body=body)
+        resource_id = int(headers["Location"].rstrip("/").split("/")[-1])
+        resource = ElabResource(self, resource_id)
+        updates = {"title": title}
+        if category is not None:
+            updates["category"] = int(category)
+        resource._sync(updates)
+        return resource
+
+    def load_resource(self, ID: int = None, title: str = None) -> ElabResource:
+        """Load a resource/item by ID or exact title."""
+        if title is not None:
+            resources = self.resources_dict
+            resolved = resources.get(title)
+            if resolved is None:
+                raise InvalidTitle(title)
+            ID = resolved
+        if ID is not None:
+            resource = ElabResource(self, ID)
+            try:
+                resource.refresh()
+            except ep.rest.ApiException as exc:
+                if exc.status == 404:
+                    raise InvalidID(ID) from exc
+                raise
+            return resource
+        raise InvalidID(ID)
 
     def _resolve_category_id(self, category: Union[int, str]) -> int:
         """Resolve a category name or ID to a valid category ID."""
@@ -184,6 +230,11 @@ class ElabClient:
         return {exp.title: exp.id for exp in self.experiments_list}
 
     @property
+    def resources_dict(self) -> dict[str, int]:
+        """Return a map of accessible resource titles to IDs."""
+        return {item.title: item.id for item in self.items.read_items()}
+
+    @property
     def category_dict(self) -> dict[str, int]:
         """Return a map of experiment category titles to IDs."""
         # Returns all possible categories in a dictionary {category_name: category_id}
@@ -198,6 +249,15 @@ class ElabClient:
         team_id = self._get_team_id()
         return {
             s.title: s.id for s in self.statuses.read_team_experiments_status(team_id)
+        }
+
+    @property
+    def resource_status_dict(self) -> dict[str, int]:
+        """Return a map of resource status titles to IDs."""
+        team_id = self._get_team_id()
+        return {
+            s.title: s.id
+            for s in self.resource_statuses.read_team_items_status(team_id)
         }
 
     def _get_team_id(self) -> int:
@@ -228,8 +288,7 @@ class ElabClient:
             team_id = getattr(team, "id", None)
         if team_id is None:
             raise RuntimeError(
-                "Unable to determine team ID. "
-                "Set TEAM_ID in elabmate.conf."
+                "Unable to determine team ID. Set TEAM_ID in elabmate.conf."
             )
         self._team_id = int(team_id)
         return self._team_id

@@ -6,6 +6,7 @@
 from .bridge import ElabBridge
 from .client import ElabClient
 from .experiment import ElabExperiment
+from .resource import ElabResource
 from .exceptions import (
     DeletedExperiment,
     DuplicateTitle,
@@ -22,6 +23,7 @@ __all__ = [
     "ElabBridge",
     "ElabClient",
     "ElabExperiment",
+    "ElabResource",
     "DeletedExperiment",
     "DuplicateTitle",
     "ElabException",

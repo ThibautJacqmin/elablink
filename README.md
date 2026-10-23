@@ -6,6 +6,7 @@ acquisitions.
 ## Features
 - `ElabClient`: high-level wrapper around the eLabFTW API client.
 - `ElabExperiment`: convenience helpers for tags, steps, comments, and uploads.
+- `ElabResource`: the same conveniences for eLabFTW resources/items.
 - `ElabBridge`: optional Labmate backend to sync acquisitions with eLabFTW.
 
 ## Installation
@@ -45,6 +46,25 @@ exp = client.create_experiment(title="My experiment")
 exp.main_text = "Experiment notes..."
 exp.add_tag("demo")
 exp.upload_file("path/to/file.dat")
+```
+
+The editable date shown as **Started on** is separate from eLabFTW's immutable
+record creation timestamp:
+
+```python
+exp.started_on = "2021-06-18"
+exp.status = "Finished"
+exp.set_extra_fields({"Author": "Ada", "Sample location": "Freezer A"})
+exp.ensure_step("Prepare the sample")
+```
+
+Resources and links are supported too:
+
+```python
+sample = client.create_resource("Sample A", category=3)
+exp.link_resource(sample.ID)
+child = client.create_experiment("Analysis of Sample A")
+exp.link_experiment(child.ID)
 ```
 
 ## Labmate integration

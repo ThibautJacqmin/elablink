@@ -7,14 +7,22 @@ remote eLabFTW experiments and their attachments, tags, steps, and comments.
 @author Thibaut Jacqmin
 """
 
+from __future__ import annotations
+
 from .exceptions import InvalidStatus, InvalidCategory, InvalidTag, DeletedExperiment
+from datetime import date, datetime
+from html import escape
 import hashlib
+import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
+from urllib.parse import urlencode
 
 
 class ElabExperiment:
     """Represents a remote eLabFTW experiment with convenience helpers."""
+
+    entity_type = "experiments"
 
     def __init__(
         self,
@@ -49,10 +57,16 @@ class ElabExperiment:
         self.api.experiments.patch_experiment(self.ID, body=updates)
         self._load()
 
+    def _category_values(self) -> dict[str, int]:
+        return self.api.category_dict
+
+    def _status_values(self) -> dict[str, int]:
+        return self.api.status_dict
+
     def add_file(self, file_path: str, comment: str = "Uploaded via API"):
         """Attach a file to the experiment via a simple upload."""
         self.api.uploads.post_upload(
-            "experiments", self.ID, file=file_path, comment=comment
+            self.entity_type, self.ID, file=file_path, comment=comment
         )
         self._load()
 
@@ -131,6 +145,12 @@ class ElabExperiment:
             raise invalid_exc(str(selection))
         selected_id = values.get(selection)
         if selected_id is None:
+            folded = str(selection).casefold()
+            selected_id = next(
+                (value for name, value in values.items() if name.casefold() == folded),
+                None,
+            )
+        if selected_id is None:
             raise invalid_exc(selection)
         return int(selected_id)
 
@@ -184,7 +204,7 @@ class ElabExperiment:
         if existing is None:
             # First time: create
             self.api.uploads.post_upload(
-                "experiments", self.ID, file=file_path, comment=comment
+                self.entity_type, self.ID, file=file_path, comment=comment
             )
             self._load()
             return
@@ -212,7 +232,7 @@ class ElabExperiment:
         if existing_id is None:
             # Worst case fallback: create new
             self.api.uploads.post_upload(
-                "experiments", self.ID, file=file_path, comment=comment
+                self.entity_type, self.ID, file=file_path, comment=comment
             )
             self._load()
             return
@@ -220,7 +240,7 @@ class ElabExperiment:
         # Official elabapi_python method for replace:
         # POST /experiments/{id}/uploads/{subid}
         self.api.uploads.post_upload_replace(
-            "experiments",
+            self.entity_type,
             self.ID,
             int(existing_id),
             file=file_path,
@@ -230,7 +250,7 @@ class ElabExperiment:
 
     def get_files(self):
         """Return the raw uploads list for this experiment."""
-        return self.api.uploads.read_uploads("experiments", self.ID)
+        return self.api.uploads.read_uploads(self.entity_type, self.ID)
 
     def list_files(self) -> list[dict[str, Any]]:
         """Return normalized metadata for all experiment uploads."""
@@ -248,6 +268,9 @@ class ElabExperiment:
                     "hash": self._get_attr(upload, "hash"),
                     "hash_algorithm": self._get_attr(upload, "hash_algorithm"),
                     "created_at": self._get_attr(upload, "created_at"),
+                    "long_name": self._get_attr(upload, "long_name"),
+                    "storage": self._get_attr(upload, "storage"),
+                    "comment": self._get_attr(upload, "comment"),
                     "raw": upload,
                 }
             )
@@ -263,26 +286,62 @@ class ElabExperiment:
     def download_file(self, file_id: int, destination: str | Path) -> Path:
         """Download one upload to a local destination path."""
         destination = Path(destination)
-        payload = self.api.download_upload("experiments", self.ID, int(file_id))
+        payload = self.api.download_upload(self.entity_type, self.ID, int(file_id))
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(payload)
         return destination
 
     def add_step(self, text: str):
         """Append a step to the experiment."""
-        self.api.steps.post_step("experiments", self.ID, body={"body": text})
+        self.api.steps.post_step(self.entity_type, self.ID, body={"body": text})
         self._load()
+
+    def ensure_step(
+        self, text: str, *, finished: bool | None = None, occurrence: int = 0
+    ) -> bool:
+        """Ensure a step exists and optionally set its completion state.
+
+        Return whether a new step was created. Completion is read before the
+        API's toggle action so retries do not accidentally uncheck a step.
+        ``occurrence`` identifies repeated labels by their zero-based position.
+        """
+        if not isinstance(occurrence, int) or occurrence < 0:
+            raise ValueError("occurrence must be a nonnegative integer")
+        matching_count = self.steps.count(text)
+        added = matching_count <= occurrence
+        while matching_count <= occurrence:
+            self.add_step(text)
+            matching_count += 1
+        if finished is not None:
+            remote_steps = self.api.steps.read_steps(self.entity_type, self.ID) or []
+            matches = [
+                step for step in remote_steps if self._get_attr(step, "body") == text
+            ]
+            if len(matches) <= occurrence:
+                raise RuntimeError(f"Step {text!r} was not returned by the server")
+            step = matches[occurrence]
+            current = self._get_attr(step, "finished", 0)
+            is_finished = current in (True, 1, "1", "true")
+            if is_finished != bool(finished):
+                self.api.steps.patch_step(
+                    self.entity_type,
+                    self.ID,
+                    int(self._get_attr(step, "id")),
+                    body={"action": "finish"},
+                )
+                self._load()
+        return added
 
     def add_comment(self, text: str):
         """Append a comment to the experiment."""
         self.api.comments.post_entity_comments(
-            "experiments", self.ID, body={"comment": text}
+            self.entity_type, self.ID, body={"comment": text}
         )
         self._load()
 
     def add_tag(self, tag: str):
         """Attach a tag to the experiment."""
-        self.api.tags.post_tag("experiments", self.ID, body={"tag": tag})
+        self.api.tags.post_tag(self.entity_type, self.ID, body={"tag": tag})
         self._load()
 
     def remove_tag(self, tag_name: str):
@@ -294,14 +353,14 @@ class ElabExperiment:
             and hasattr(tags_api, "patch_tag")
         ):
             try:
-                for tag in tags_api.read_tags("experiments", self.ID) or []:
+                for tag in tags_api.read_tags(self.entity_type, self.ID) or []:
                     if self._get_attr(tag, "tag") != tag_name:
                         continue
                     tag_id = self._get_attr(tag, "id")
                     if tag_id is None:
                         break
                     tags_api.patch_tag(
-                        "experiments",
+                        self.entity_type,
                         self.ID,
                         int(tag_id),
                         body={"action": "unreference"},
@@ -322,7 +381,7 @@ class ElabExperiment:
 
     def clear_tags(self):
         """Remove all tags from the experiment."""
-        self.api.tags.delete_tag("experiments", id=self.ID)
+        self.api.tags.delete_tag(self.entity_type, id=self.ID)
         self._load()
 
     @property
@@ -349,7 +408,9 @@ class ElabExperiment:
             return category_title
         category_id = self._data.get("category")
         try:
-            resolved = self._resolve_name_from_dict(self.api.category_dict, category_id)
+            resolved = self._resolve_name_from_dict(
+                self._category_values(), category_id
+            )
         except Exception:
             resolved = None
         if resolved:
@@ -360,7 +421,7 @@ class ElabExperiment:
     def category(self, category_name: str | int):
         category_id = self._resolve_existing_id(
             category_name,
-            self.api.category_dict,
+            self._category_values(),
             InvalidCategory,
         )
         self._sync({"category": category_id})
@@ -378,7 +439,7 @@ class ElabExperiment:
         if tags_api is None or not hasattr(tags_api, "read_tags"):
             return []
         try:
-            remote_tags = tags_api.read_tags("experiments", self.ID)
+            remote_tags = tags_api.read_tags(self.entity_type, self.ID)
         except Exception:
             return []
         names = []
@@ -402,7 +463,7 @@ class ElabExperiment:
         if steps_api is None or not hasattr(steps_api, "read_steps"):
             return []
         try:
-            remote_steps = steps_api.read_steps("experiments", self.ID)
+            remote_steps = steps_api.read_steps(self.entity_type, self.ID)
         except Exception:
             return []
         return [
@@ -425,7 +486,9 @@ class ElabExperiment:
         if comments_api is None or not hasattr(comments_api, "read_entity_comments"):
             return []
         try:
-            remote_comments = comments_api.read_entity_comments("experiments", self.ID)
+            remote_comments = comments_api.read_entity_comments(
+                self.entity_type, self.ID
+            )
         except Exception:
             return []
         return [
@@ -460,7 +523,7 @@ class ElabExperiment:
             return status_title
         status_id = self._data.get("status")
         try:
-            resolved = self._resolve_name_from_dict(self.api.status_dict, status_id)
+            resolved = self._resolve_name_from_dict(self._status_values(), status_id)
         except Exception:
             resolved = None
         if resolved:
@@ -471,7 +534,7 @@ class ElabExperiment:
     def status(self, status_name: str | int):
         status_id = self._resolve_existing_id(
             status_name,
-            self.api.status_dict,
+            self._status_values(),
             InvalidStatus,
         )
         self._sync({"status": status_id})
@@ -480,6 +543,146 @@ class ElabExperiment:
     def creation_date(self):
         """Creation timestamp for the experiment."""
         return self._data.get("created_at")
+
+    @property
+    def date(self):
+        """The editable eLabFTW ``Started on`` date."""
+        return self._data.get("date") or self._data.get("_date")
+
+    @date.setter
+    def date(self, value: str | date | datetime):
+        if isinstance(value, datetime):
+            value = value.date()
+        if isinstance(value, date):
+            value = value.isoformat()
+        self._sync({"date": str(value)})
+
+    @property
+    def started_on(self):
+        """Alias for :attr:`date`."""
+        return self.date
+
+    @started_on.setter
+    def started_on(self, value: str | date | datetime):
+        self.date = value
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        """Return eLabFTW metadata as a dictionary."""
+        raw = self._data.get("metadata")
+        if not raw:
+            return {}
+        if isinstance(raw, dict):
+            return raw
+        try:
+            return json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return {}
+
+    @metadata.setter
+    def metadata(self, value: Mapping[str, Any] | str):
+        payload = (
+            value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        )
+        self._sync({"metadata": payload})
+
+    @staticmethod
+    def _extra_field(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict) and "value" in value:
+            return dict(value)
+        if isinstance(value, bool):
+            field_type = "checkbox"
+        elif isinstance(value, (int, float)):
+            field_type = "number"
+        elif isinstance(value, datetime):
+            field_type = "datetime-local"
+            value = value.isoformat()
+        elif isinstance(value, date):
+            field_type = "date"
+            value = value.isoformat()
+        else:
+            field_type = "text"
+        return {"type": field_type, "value": value}
+
+    def set_extra_fields(self, fields: Mapping[str, Any], *, merge: bool = True):
+        """Create or update eLabFTW custom fields in the metadata payload."""
+        metadata = self.metadata if merge else {}
+        extra_fields = dict(metadata.get("extra_fields") or {})
+        for name, value in fields.items():
+            extra_fields[str(name)] = self._extra_field(value)
+        metadata["extra_fields"] = extra_fields
+        self.metadata = metadata
+
+    def _linked_ids(self, kind: str) -> set[int]:
+        api = (
+            self.api.experiment_links if kind == "experiments" else self.api.item_links
+        )
+        reader = (
+            api.read_entity_experiments_links
+            if kind == "experiments"
+            else api.read_entity_items_links
+        )
+        links = reader(self.entity_type, self.ID) or []
+        result = set()
+        for link in links:
+            value = self._get_attr(link, "entityid", self._get_attr(link, "id"))
+            if value is not None:
+                result.add(int(value))
+        return result
+
+    def link_experiment(self, experiment_id: int) -> bool:
+        """Link an experiment, skipping an already existing link."""
+        experiment_id = int(experiment_id)
+        if experiment_id in self._linked_ids("experiments"):
+            return False
+        self.api.experiment_links.post_entity_experiments_links(
+            self.entity_type, self.ID, experiment_id
+        )
+        self._load()
+        return True
+
+    def link_resource(self, resource_id: int) -> bool:
+        """Link a resource/item, skipping an already existing link."""
+        resource_id = int(resource_id)
+        if resource_id in self._linked_ids("items"):
+            return False
+        self.api.item_links.post_entity_items_links(
+            self.entity_type, self.ID, resource_id
+        )
+        self._load()
+        return True
+
+    def uploaded_file_url(self, filename: str) -> str:
+        """Return the eLabFTW download URL used for an uploaded file."""
+        upload = self.get_file(filename)
+        if upload is None:
+            raise FileNotFoundError(filename)
+        long_name = upload.get("long_name")
+        if not long_name:
+            raise ValueError(f"Upload {filename!r} has no long_name")
+        host = self.api.configuration.host.rstrip("/")
+        if host.endswith("/api/v2"):
+            host = host[:-7]
+        storage = upload.get("storage")
+        query = urlencode(
+            {"f": long_name, "storage": 1 if storage is None else storage}
+        )
+        return f"{host}/app/download.php?{query}"
+
+    def inline_image_html(self, filename: str, alt: str | None = None) -> str:
+        """Build HTML that displays an uploaded image in the main text."""
+        url = self.uploaded_file_url(filename)
+        return f'<img src="{escape(url, quote=True)}" alt="{escape(alt or filename, quote=True)}">'
+
+    def upload_inline_image(
+        self,
+        file_path: str | Path,
+        alt: str | None = None,
+        comment: str = "Imported image",
+    ) -> str:
+        """Upload an image and return its inline HTML element."""
+        self.upload_file(str(file_path), comment=comment)
+        return self.inline_image_html(Path(file_path).name, alt=alt)
 
     @property
     def last_modification(self):
