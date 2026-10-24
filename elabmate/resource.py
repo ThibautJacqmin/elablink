@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""High-level wrapper for eLabFTW resources/items."""
+"""High-level wrapper for eLabFTW resources/items.
+
+@author Thibaut Jacqmin
+"""
 
 from .exceptions import InvalidCategory
 from .experiment import ElabExperiment

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Labmate integration bridge for eLabFTW.
 
-This module provides :class:`ElabBridge`, an optional backend that can
-sync Labmate acquisitions and analysis metadata to eLabFTW experiments.
+This module provides :class:`ElabBridge`, the synchronous integration engine
+used by the asynchronous bridge, with compatibility for older Labmate backends.
 
 @author Thibaut Jacqmin
 """
@@ -107,14 +107,13 @@ class ElabBridge(AcquisitionBackend):
         Return the ElabExperiment linked to acquisition or analysis context.
 
         Notes:
-        - `save_snapshot` runs asynchronously in Labmate. Right after `save_acquisition`,
-          the experiment might not yet be attached to the acquisition object.
-        - Set `wait` (seconds) to poll until the experiment becomes available.
-        - If `acquisition` is None, use the most recently seen acquisition.
-        - `acquisition` can be one of:
-          - NotebookAcquisitionData
-          - AcquisitionAnalysisManager (aqm)
-          - AnalysisData (aqm.data / aqm.current_analysis)
+            This compatibility API is synchronous and may contact the server.
+            Its optional polling is useful when an external caller schedules saves.
+            Current notebook integrations use ``aqm.experiment`` instead.
+
+            * Set ``wait`` (seconds) to poll until the experiment becomes available.
+            * If ``acquisition`` is None, use the most recently seen acquisition.
+            * Accepted inputs are acquisition data, a manager, or analysis data.
         """
         source = acquisition
         acq = self._resolve_acquisition_source(source)
@@ -213,7 +212,7 @@ class ElabBridge(AcquisitionBackend):
             "title": getattr(acquisition, "experiment_name", None),
             "attachments": attachments,
         }
-        if metadata:
+        if metadata is not None:
             payload["metadata"] = dict(metadata)
         return payload
 
@@ -272,6 +271,9 @@ class ElabBridge(AcquisitionBackend):
         if body is not None and hasattr(experiment, "main_text"):
             experiment.main_text = body
 
+        if "metadata" in payload and payload["metadata"] is not None:
+            experiment.metadata = payload["metadata"]
+
         category = payload.get("category")
         if category is not None and hasattr(experiment, "category"):
             experiment.category = category
@@ -281,8 +283,7 @@ class ElabBridge(AcquisitionBackend):
             experiment.status = status
 
         tags = payload.get("tags")
-        if tags is not None and hasattr(experiment, "clear_tags"):
-            experiment.clear_tags()
+        if tags is not None:
             for tag in tags:
                 if hasattr(experiment, "add_tag"):
                     experiment.add_tag(tag)

@@ -1,0 +1,39 @@
+:root {
+    --elabmate-ink: #143d48;
+    --elabmate-accent: #bb673b;
+}
+
+body {
+    color: #26343a;
+    background: #fbfaf7;
+}
+
+div.body {
+    background: #ffffff;
+}
+
+h1, h2, h3, h4, div.sphinxsidebar h3 {
+    color: var(--elabmate-ink);
+}
+
+a, div.sphinxsidebar a {
+    color: #116978;
+}
+
+a:hover, div.sphinxsidebar a:hover {
+    color: var(--elabmate-accent);
+}
+
+div.admonition {
+    border-left: 4px solid #47939b;
+    border-radius: 3px;
+}
+
+pre {
+    border: 1px solid #e4e8e6;
+    border-radius: 5px;
+}
+
+div.sphinxsidebarwrapper p.logo img {
+    max-width: 210px;
+}

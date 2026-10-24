@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use eLabmate in your work, please cite this software."
+type: software
+title: "eLabmate: Python helpers for eLabFTW and Labmate acquisition"
+authors:
+  - family-names: Jacqmin
+    given-names: Thibaut
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/ThibautJacqmin/elabmate"
+url: "https://github.com/ThibautJacqmin/elabmate"
+

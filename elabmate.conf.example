@@ -1,6 +1,6 @@
-API_HOST_URL=https://elabftw_server_ip_address/api/v2
-API_KEY= you API key, generated from the eLabFTW interface: Settings/API Key
+API_HOST_URL=https://your-elabftw-server.example/api/v2
+API_KEY=replace-with-your-own-api-key
 UNIQUE_EXPERIMENTS_TITLES=true
-VERIFY_SSL=false
-TEAM_ID= check the team id (integer 1, 2, 3...) on eLabFTW interface: SysAdmin panel/TEAMS
-LABMATE_DATA_DIR=optional, only if you use labmate
+VERIFY_SSL=true
+# Optional: uncomment and replace with your eLabFTW team ID if automatic lookup fails.
+# TEAM_ID=1

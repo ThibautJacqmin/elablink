@@ -9,7 +9,7 @@ remote eLabFTW experiments and their attachments, tags, steps, and comments.
 
 from __future__ import annotations
 
-from .exceptions import InvalidStatus, InvalidCategory, InvalidTag, DeletedExperiment
+from .exceptions import InvalidStatus, InvalidCategory, DeletedExperiment
 from datetime import date, datetime
 from html import escape
 import hashlib
@@ -344,45 +344,9 @@ class ElabExperiment:
         self.api.tags.post_tag(self.entity_type, self.ID, body={"tag": tag})
         self._load()
 
-    def remove_tag(self, tag_name: str):
-        """Remove a tag reference from the experiment."""
-        tags_api = getattr(self.api, "tags", None)
-        if (
-            tags_api is not None
-            and hasattr(tags_api, "read_tags")
-            and hasattr(tags_api, "patch_tag")
-        ):
-            try:
-                for tag in tags_api.read_tags(self.entity_type, self.ID) or []:
-                    if self._get_attr(tag, "tag") != tag_name:
-                        continue
-                    tag_id = self._get_attr(tag, "id")
-                    if tag_id is None:
-                        break
-                    tags_api.patch_tag(
-                        self.entity_type,
-                        self.ID,
-                        int(tag_id),
-                        body={"action": "unreference"},
-                    )
-                    self._load()
-                    return
-            except Exception:
-                pass
-        for tag in self.tags:
-            if tag == tag_name:
-                self.clear_tags()
-                return
-        raise InvalidTag(tag_name)
-
     def has_tag(self, tag_name: str) -> bool:
         """Return True if a tag is present on the experiment."""
         return tag_name in self.tags
-
-    def clear_tags(self):
-        """Remove all tags from the experiment."""
-        self.api.tags.delete_tag(self.entity_type, id=self.ID)
-        self._load()
 
     @property
     def _data(self):
@@ -568,22 +532,34 @@ class ElabExperiment:
 
     @property
     def metadata(self) -> dict[str, Any]:
-        """Return eLabFTW metadata as a dictionary."""
+        """Return metadata as a dictionary, rejecting malformed/non-object JSON."""
         raw = self._data.get("metadata")
-        if not raw:
+        if raw is None or raw == "":
             return {}
         if isinstance(raw, dict):
-            return raw
+            return dict(raw)
         try:
-            return json.loads(raw)
-        except (TypeError, json.JSONDecodeError):
-            return {}
+            value = json.loads(raw)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("eLabFTW metadata must be a JSON object") from exc
+        if not isinstance(value, dict):
+            raise ValueError("eLabFTW metadata must be a JSON object")
+        return value
 
     @metadata.setter
     def metadata(self, value: Mapping[str, Any] | str):
-        payload = (
-            value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
-        )
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError("Metadata must be a JSON object") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError("Metadata must be a JSON object")
+            payload = value
+        elif isinstance(value, Mapping):
+            payload = json.dumps(dict(value), ensure_ascii=False)
+        else:
+            raise ValueError("Metadata must be a JSON object or mapping")
         self._sync({"metadata": payload})
 
     @staticmethod

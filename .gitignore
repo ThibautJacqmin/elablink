@@ -20,6 +20,9 @@ build/
 dist/
 *.egg-info/
 .eggs/
+docs/_build/
+.pytest_cache/
+.ruff_cache/
 
 # ============================================================
 # Jupyter
@@ -48,6 +51,10 @@ dist/
 elabmate.conf
 *.conf
 *.env
+
+# Generated acquisition files and local upload snapshots from the VS Code example.
+examples/data/
+data/
 
 # ============================================================
 # OS-specific

@@ -39,13 +39,6 @@ class InvalidID(ElabException):
         super().__init__(f"{ID} does not exist")
 
 
-class InvalidTag(ElabException):
-    """Raised when a tag lookup fails."""
-
-    def __init__(self, name: str):
-        super().__init__(f"Tag '{name}' not found.")
-
-
 class InvalidCategory(ElabException):
     """Raised when a category lookup fails."""
 

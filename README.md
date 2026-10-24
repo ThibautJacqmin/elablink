@@ -1,94 +1,85 @@
-# elabmate
+# eLabmate
 
-Python helpers to work with eLabFTW from Python and (optionally) sync Labmate
-acquisitions.
+<img src="docs/_static/elabmate-logo.png" alt="eLabmate: a physics laboratory notebook" width="180">
 
-## Features
-- `ElabClient`: high-level wrapper around the eLabFTW API client.
-- `ElabExperiment`: convenience helpers for tags, steps, comments, and uploads.
-- `ElabResource`: the same conveniences for eLabFTW resources/items.
-- `ElabBridge`: optional Labmate backend to sync acquisitions with eLabFTW.
+Python measurements, lab notebook records.
+
+**Written and maintained by Thibaut Jacqmin.** eLabmate provides convenient
+Python access to eLabFTW experiments and resources, with an optional Labmate
+manager that saves locally and uploads checkpoints in the background.
+
+## Choose your workflow
+
+- [eLabFTW only](docs/elabftw_only.rst): create experiments/resources, edit notes
+  and custom fields, add steps/comments/tags, attach files and link records.
+- [Jupyter acquisition](docs/notebooks.rst): keep Labmate's familiar acquisition
+  and analysis cells, with automatic background uploads.
+- [Python script acquisition](docs/scripts.rst): the same saves without a
+  notebook, including an executable sinusoid example.
 
 ## Installation
 
-Editable install for local development:
+Python 3.10 or newer is required. From this checkout, install in editable
+(developer) mode:
 
-```bash
-python -m pip install -e .
+```console
+python -m pip install --use-pep517 -e .
 ```
 
-## Configuration
-
-Create a configuration file (default: `elabmate.conf`) with one `KEY=VALUE`
-per line:
-
-```ini
-API_HOST_URL=https://elabftw_server_ip_address/api/v2
-API_KEY= you API key, generated from the eLabFTW interface: Settings/API Key
-UNIQUE_EXPERIMENTS_TITLES=true
-VERIFY_SSL=false
-TEAM_ID= check the team id (integer 1, 2, 3...) on eLabFTW interface: SysAdmin panel/TEAMS
-LABMATE_DATA_DIR=optional, only if you use labmate
-```
-
-Notes:
-- `TEAM_ID` is optional; when absent, the client tries to resolve it from the API.
-- `VERIFY_SSL` accepts `true` or `false`, depending on how you configured the server
-
-## Quickstart
+Labmate is optional for direct eLabFTW use. Acquisition integration requires
+Labmate with the `analysis_figure_saved` lifecycle hook. For the neighbouring
+local checkouts, run this **in your notebook's environment**:
 
 ```python
-from elabmate import ElabClient
-
-client = ElabClient()
-exp = client.create_experiment(title="My experiment")
-
-exp.main_text = "Experiment notes..."
-exp.add_tag("demo")
-exp.upload_file("path/to/file.dat")
+%pip install --use-pep517 -e "../labmate_kyrylo" -e "." numpy matplotlib
 ```
 
-The editable date shown as **Started on** is separate from eLabFTW's immutable
-record creation timestamp:
+Then restart the kernel. See [installation and configuration](docs/installation.rst)
+for paths, packaging-tool troubleshooting and the required `elabmate.conf`.
+Keep your API key private and TLS certificate verification enabled.
+
+## A notebook starts with
 
 ```python
-exp.started_on = "2021-06-18"
-exp.status = "Finished"
-exp.set_extra_fields({"Author": "Ada", "Sample location": "Freezer A"})
-exp.ensure_step("Prepare the sample")
+from elabmate import AcquisitionAnalysisManager
+
+aqm = AcquisitionAnalysisManager("data")
 ```
 
-Resources and links are supported too:
+Use the usual `acquisition_cell()`, `save_acquisition()`, `analysis_cell()` and
+`save_fig()` calls. Finish with `aqm.close()` to wait for uploads and report
+failures. The [four-cell sinusoid notebook](example_labmate_elabFTW_bridge.ipynb)
+is ready to try, as is the [VS Code cell script](example_labmate_acquisition_analysis.py).
 
-```python
-sample = client.create_resource("Sample A", category=3)
-exp.link_resource(sample.ID)
-child = client.create_experiment("Analysis of Sample A")
-exp.link_experiment(child.ID)
+Local writes and stable snapshot copies happen before background networking.
+There is no automatic retry or restart recovery; read the
+[failure and timeout guide](docs/background_uploads.rst) before an acquisition
+campaign. The existing synchronous `ElabBridge` remains available for advanced
+callers, but the manager above is the recommended notebook interface.
+
+## Documentation and tests
+
+The Sphinx documentation is ready for Read the Docs through `.readthedocs.yaml`.
+To build it locally with Python 3.12:
+
+```console
+python -m pip install --use-pep517 -e . -r docs/requirements.txt
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
-## Labmate integration
+Open `docs/_build/html/index.html`. Documentation builds do not run the examples
+or connect to a server. See [development](docs/contributing.rst) for offline
+tests; run live-server tests only deliberately.
 
-`ElabBridge` implements a Labmate acquisition backend interface. You can
-register it where Labmate expects a backend:
+## Author and acknowledgements
 
-```python
-from elabmate import ElabBridge
+Thibaut Jacqmin is the original author and maintainer. Improvements, tests and
+documentation have also received AI-assisted coding support under his direction.
+The repository history and existing licence notices are preserved.
 
-backend = ElabBridge(client)
-# Attach `backend` to your Labmate acquisition manager.
-```
-
-## Tests
-
-Run integration tests (requires a valid eLabFTW server/config):
-
-```bash
-python -m unittest discover -s tests -p "test_*.py"
-```
-
-## References
-- eLabFTW documentation: https://doc.elabftw.net/
-- eLabFTW API docs: https://doc.elabftw.net/api/
-- Labmate docs: https://kyrylo-gr.github.io/labmate/
-- Labmate GitHub: https://github.com/kyrylo-gr/labmate
+eLabmate uses [eLabFTW](https://www.elabftw.net/),
+[elabapi-python](https://github.com/elabftw/elabapi-python) and, optionally,
+[Labmate](https://github.com/kyrylo-gr/labmate). These are independent projects
+with their own authors and licences; eLabmate does not imply their endorsement.
+See [about and credits](docs/about.rst), [citation metadata](CITATION.cff),
+[authorship](AUTHORS.rst), and the existing [licence](LICENSE).
