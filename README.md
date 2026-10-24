@@ -4,9 +4,8 @@
 
 Python measurements, lab notebook records.
 
-**Written and maintained by Thibaut Jacqmin.** eLabmate provides convenient
-Python access to eLabFTW experiments and resources, with an optional Labmate
-manager that saves locally and uploads checkpoints in the background.
+eLabmate provides convenient Python access to eLabFTW experiments and resources, 
+with an optional Labmate manager that saves locally and uploads checkpoints in the background.
 
 ## Choose your workflow
 
