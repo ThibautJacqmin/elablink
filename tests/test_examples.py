@@ -77,6 +77,17 @@ class ExperimentResourceExampleTests(unittest.TestCase):
                     example.main([])
         client.assert_not_called()
 
+    def test_duplicate_experiment_title_does_not_create_an_unused_resource(self):
+        from elablink import DuplicateTitle
+
+        example = load_example("experiments_and_resources")
+        client = Mock(spec=Client)
+        client.create_experiment.side_effect = DuplicateTitle("Test")
+        with patch.object(example, "Client", return_value=client):
+            with self.assertRaises(DuplicateTitle):
+                example.main(["--title", "Test", "--resource-category", "7"])
+        client.create_resource.assert_not_called()
+
     def test_notebook_contains_no_saved_outputs(self):
         notebook = json.loads(
             (ROOT / "examples" / "labmate_notebook.ipynb").read_text(encoding="utf-8")

@@ -20,7 +20,7 @@ Live integration tests are skipped unless ``ELABLINK_LIVE_TESTS=1`` is explicitl
 set. Leave that variable unset for offline testing.
 
 To deliberately test a disposable server, first review
-``tests/test_elab_experiment.py``. It requires ``ELABLINK_CONFIG`` pointing to
+``tests/test_experiment.py``. It requires ``ELABLINK_CONFIG`` pointing to
 a test configuration; the resource test also requires
 ``ELABLINK_RESOURCE_CATEGORY_ID``. These tests create real records and leave
 them for inspection. Do not point them at a production configuration by accident.

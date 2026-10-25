@@ -1,4 +1,4 @@
-include LICENSE AUTHORS.rst CITATION.cff README.md elablink.conf.example
+include LICENSE AUTHORS.rst CITATION.cff README.md elablink.conf.example run_tests.py
 include .readthedocs.yaml
 include examples/experiments_and_resources.py
 include examples/labmate_notebook.ipynb examples/labmate_acquisition.py
