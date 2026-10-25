@@ -12,8 +12,8 @@ from labmate.acquisition_notebook import (
     AcquisitionAnalysisManager as LabmateAcquisitionAnalysisManager,
 )
 
-from .async_bridge import AsyncElabBridge
-from .async_experiment import AsyncElabExperiment
+from .async_bridge import AsyncBridge
+from .async_experiment import AsyncExperiment
 
 
 class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
@@ -21,16 +21,16 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
 
     Use exactly like Labmate's manager, selecting this class through the import::
 
-        from elabmate import AcquisitionAnalysisManager
+        from elablink import AcquisitionAnalysisManager
         aqm = AcquisitionAnalysisManager("data")
 
     The name passed to ``acquisition_cell`` selects the remote experiment. Reopened
     analyses use their data folder name. ``experiment_title`` overrides that routing;
     ``experiment_id`` sends everything to one existing experiment. Title reuse follows
-    ``UNIQUE_EXPERIMENTS_TITLES`` in ``elabmate.conf``.
+    ``UNIQUE_EXPERIMENTS_TITLES`` in ``elablink.conf``.
 
     Standard Labmate keyword arguments are forwarded unchanged. Additional options
-    configure :class:`AsyncElabBridge`; the spool defaults to ``.upload_queue`` inside
+    configure :class:`AsyncBridge`; the spool defaults to ``.upload_queue`` inside
     the local data directory. Network operations run on one worker, not in save cells.
 
     Call ``close()`` before restarting the kernel to finish uploads and report errors.
@@ -44,7 +44,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         *,
         experiment_title: Optional[str] = None,
         experiment_id: Optional[int] = None,
-        config_path: Union[str, Path] = "elabmate.conf",
+        config_path: Union[str, Path] = "elablink.conf",
         spool_directory: Optional[Union[str, Path]] = None,
         request_timeout: Tuple[float, float] = (5, 30),
         client_factory: Optional[Callable[[], Any]] = None,
@@ -53,7 +53,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         super().__init__(data_directory, **kwargs)
         if spool_directory is None:
             spool_directory = Path(str(self.data_directory)) / ".upload_queue"
-        self._elab_bridge = AsyncElabBridge(
+        self._elab_bridge = AsyncBridge(
             experiment_title,
             config_path=config_path,
             spool_directory=spool_directory,
@@ -68,7 +68,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
             raise
 
     @property
-    def experiment(self) -> AsyncElabExperiment:
+    def experiment(self) -> AsyncExperiment:
         """Access queued edits for the current acquisition or analysis's experiment.
 
         The handle does not wait for the server, and stays bound to its experiment

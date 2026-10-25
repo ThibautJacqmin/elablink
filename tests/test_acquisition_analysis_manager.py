@@ -11,7 +11,7 @@ from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
 
-from elabmate.exceptions import DuplicateTitle
+from elablink.exceptions import DuplicateTitle
 from tests.fakes import OfflineExperiment
 
 
@@ -55,7 +55,7 @@ class MultiExperimentClient:
         self.experiments[title] = experiment
         return experiment
 
-    def load_experiment(self, *, ID=None, title=None):  # noqa: N803 - ElabClient API
+    def load_experiment(self, *, ID=None, title=None):  # noqa: N803 - Client API
         self.thread_ids.append(threading.get_ident())
         self.load_requests.append((ID, title))
         if title is not None:
@@ -64,7 +64,7 @@ class MultiExperimentClient:
 
 
 class OptionalLabmateTests(unittest.TestCase):
-    def test_regular_elabmate_import_still_works_when_labmate_is_not_installed(self):
+    def test_regular_elablink_import_still_works_when_labmate_is_not_installed(self):
         script = textwrap.dedent(
             """
             import sys
@@ -77,11 +77,11 @@ class OptionalLabmateTests(unittest.TestCase):
                         )
 
             sys.meta_path.insert(0, BlockLabmate())
-            import elabmate
-            assert elabmate.ElabClient is not None
-            assert elabmate.AsyncElabBridge is not None
+            import elablink
+            assert elablink.Client is not None
+            assert elablink.AsyncBridge is not None
             try:
-                from elabmate import AcquisitionAnalysisManager
+                from elablink import AcquisitionAnalysisManager
             except ModuleNotFoundError as error:
                 assert error.name == 'labmate', error
             else:
@@ -117,7 +117,7 @@ class AcquisitionAnalysisManagerTests(unittest.TestCase):
                 manager.close(timeout=5)
 
     def manager(self, client, **kwargs):
-        from elabmate import AcquisitionAnalysisManager
+        from elablink import AcquisitionAnalysisManager
 
         options = {
             "shell": None,
@@ -381,7 +381,7 @@ class AcquisitionAnalysisManagerTests(unittest.TestCase):
 
         experiment.upload_file = failed_upload
         manager = self.manager(client)
-        with self.assertLogs("elabmate.async_bridge", level="ERROR"):
+        with self.assertLogs("elablink.async_bridge", level="ERROR"):
             with self.assertRaisesRegex(ValueError, "analysis failed"):
                 with manager:
                     self.acquire(manager)

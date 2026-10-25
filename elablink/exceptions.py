@@ -5,55 +5,55 @@
 """
 
 
-class ElabException(Exception):
-    """Base exception for ElabFTW integration."""
+class ELabError(Exception):
+    """Base exception for eLabFTW integration."""
 
     pass
 
 
-class DuplicateTitle(ElabException):
+class DuplicateTitle(ELabError):
     """Raised when an experiment title already exists."""
 
     def __init__(self, title: str):
         super().__init__(f"An experiment with title '{title}' already exists.")
 
 
-class InvalidTemplate(ElabException):
+class InvalidTemplate(ELabError):
     """Raised when a template name cannot be resolved."""
 
     def __init__(self, name: str):
         super().__init__(f"Template named '{name}' not found.")
 
 
-class InvalidTitle(ElabException):
+class InvalidTitle(ELabError):
     """Raised when a title lookup fails."""
 
     def __init__(self, title: str):
         super().__init__(f"{title} does not exist")
 
 
-class InvalidID(ElabException):
+class InvalidID(ELabError):
     """Raised when an ID lookup fails."""
 
     def __init__(self, ID: str):
         super().__init__(f"{ID} does not exist")
 
 
-class InvalidCategory(ElabException):
+class InvalidCategory(ELabError):
     """Raised when a category lookup fails."""
 
     def __init__(self, name: str):
         super().__init__(f"Category '{name}' not found.")
 
 
-class InvalidStatus(ElabException):
+class InvalidStatus(ELabError):
     """Raised when a status lookup fails."""
 
     def __init__(self, name: str):
         super().__init__(f"Status '{name}' not found.")
 
 
-class DeletedExperiment(ElabException):
+class DeletedExperiment(ELabError):
     """Raised when an experiment is missing or deleted."""
 
     def __init__(self):

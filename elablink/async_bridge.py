@@ -15,9 +15,9 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from .async_experiment import AsyncElabExperiment
-from .bridge import ElabBridge
-from .client import ElabClient
+from .async_experiment import AsyncExperiment
+from .bridge import Bridge
+from .client import Client
 
 
 logger = logging.getLogger(__name__)
@@ -56,14 +56,14 @@ def _set_request_timeouts(client: Any, timeout: Tuple[float, float]) -> None:
     client.api_client.call_api = call_api
 
 
-class AsyncElabBridge:
+class AsyncBridge:
     """Upload Labmate save checkpoints on one background worker.
 
     Args:
         title: Optional fixed eLabFTW experiment title. Otherwise use the acquisition
             name, or the data folder name for reopened analyses. Existing titles are
             reused when UNIQUE_EXPERIMENTS_TITLES is enabled in the configuration.
-        config_path: ElabClient configuration file, relative to the current directory.
+        config_path: Client configuration file, relative to the current directory.
         spool_directory: Local directory used for stable copies of files to upload.
         experiment_id: Existing experiment ID to use instead of resolving the title.
         request_timeout: Default HTTP connection and read timeouts, in seconds.
@@ -83,7 +83,7 @@ class AsyncElabBridge:
         self,
         title: Optional[str] = None,
         *,
-        config_path: Union[str, Path] = "elabmate.conf",
+        config_path: Union[str, Path] = "elablink.conf",
         spool_directory: Union[str, Path] = "data/.upload_queue",
         experiment_id: Optional[int] = None,
         request_timeout: Tuple[float, float] = (5, 30),
@@ -105,8 +105,8 @@ class AsyncElabBridge:
         self._client = None
         self._bridge = None
         self._experiments: Dict[Union[str, int], Any] = {}
-        self._experiment_handles: Dict[Union[str, int], AsyncElabExperiment] = {}
-        self._latest_experiment: Optional[AsyncElabExperiment] = None
+        self._experiment_handles: Dict[Union[str, int], AsyncExperiment] = {}
+        self._latest_experiment: Optional[AsyncExperiment] = None
         self._worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="elabftw")
         self._owner = threading.get_ident()
         self._closed = False
@@ -158,14 +158,14 @@ class AsyncElabBridge:
         return self.experiment_id if self.experiment_id is not None else title
 
     @property
-    def experiment(self) -> AsyncElabExperiment:
+    def experiment(self) -> AsyncExperiment:
         """Return a bound editing handle for the most recently submitted checkpoint."""
         self._check_open()
         if self._latest_experiment is None:
             raise RuntimeError("Save an acquisition before accessing the experiment")
         return self._latest_experiment
 
-    def experiment_for(self, data: Any) -> AsyncElabExperiment:
+    def experiment_for(self, data: Any) -> AsyncExperiment:
         """Return a bound editing handle for this acquisition or analysis context."""
         self._check_open()
         key = self._experiment_key(self._title_for(data))
@@ -211,7 +211,7 @@ class AsyncElabBridge:
             raise
         self.latest_snapshot = future
         key = self._experiment_key(title)
-        handle = AsyncElabExperiment(self, key, title, future)
+        handle = AsyncExperiment(self, key, title, future)
         self._experiment_handles[key] = handle
         self._latest_experiment = handle
         self._jobs.append(_Job(label, future))
@@ -220,12 +220,12 @@ class AsyncElabBridge:
     def _ensure_remote(self, snapshot: _Snapshot) -> Any:
         if self._client is None:
             if self._client_factory is None:
-                self._client = ElabClient(str(self.config_path))
+                self._client = Client(str(self.config_path))
                 _set_request_timeouts(self._client, self._request_timeout)
             else:
                 self._client = self._client_factory()
         if self._bridge is None:
-            self._bridge = ElabBridge(self._client)
+            self._bridge = Bridge(self._client)
         key = self._experiment_key(snapshot.experiment_name)
         if key not in self._experiments:
             if self.experiment_id is not None:
@@ -341,7 +341,7 @@ class AsyncElabBridge:
         finally:
             self._worker.shutdown(wait=False)
 
-    def __enter__(self) -> AsyncElabBridge:
+    def __enter__(self) -> AsyncBridge:
         self._check_open()
         return self
 

@@ -1,109 +1,123 @@
 Background uploads and failures
 ===============================
 
-What is asynchronous?
----------------------
-
-An acquisition or figure save first writes locally with Labmate. eLabmate then
-copies the relevant HDF5 file and matching sidecar files into a local upload
-snapshot. That local copy takes some time; it is **not** a zero-cost operation.
-Network requests run afterwards, in order, on a single background worker.
-
-The snapshot prevents the worker from reading a half-updated file while your
-next cell changes the original. Do not modify those files from another process
-while a snapshot is being captured. Keep the data directory and upload queue on
-a local disk if your aim is to avoid network delays during acquisition.
-
-``aqm.experiment`` edits use the same worker. They wait for the saved checkpoint
-associated with their handle to succeed. If that prerequisite fails, the edit
-fails instead of being applied to an experiment with no confirmed checkpoint.
-
-What is uploaded?
------------------
-
-The bridge captures the selected run's HDF5 file and matching saved sidecars,
-including figures and separate code files when available. It does not
-recursively upload arbitrary files in your data folder. Local files remain
-the primary copy; uploading is a second destination, not a replacement for
-your laboratory's backup policy.
-
-When does the notebook wait?
+What runs in the background?
 ----------------------------
 
-* Saving waits for Labmate's local write and the local snapshot copy.
-* ``upload_status()`` reads local job states without a server request.
-* ``flush()`` waits for jobs submitted before that call, without closing.
-* ``close()`` stops new submissions and waits for the submitted jobs.
-* Leaving a ``with`` block closes the manager.
+The Labmate integration uses this sequence:
 
-The default wait timeout is 120 seconds. To wait longer:
+1. Labmate saves the data or figure locally.
+2. eLabLink makes a stable local copy of the run's files.
+3. One background worker uploads that copy to eLabFTW, in submission order.
+
+The first two steps happen before the save call returns. They are not
+zero-cost, but network delays occur on the worker, not in the acquisition cell.
+The copy stops a later save changing files that the worker is still uploading.
+Keep the data directory and upload queue on a local disk if you want to avoid
+network waits during acquisition. Do not modify the files from another process
+while their snapshot is being captured.
+
+The integration uses the current Labmate lifecycle hooks for acquisition saves
+and analysis-figure saves. No alternative Labmate storage backend is required.
+
+What gets uploaded?
+-------------------
+
+The selected run's HDF5 file and matching saved sidecars, including figures
+and separate code files when available. Labmate stores acquisition and analysis
+code in the HDF5 file; its ``save_files=True`` option also writes separate
+code/configuration files.
+
+The integration does not upload arbitrary files throughout your data directory.
+Local data remains the primary copy, and eLabFTW synchronisation is not a
+replacement for your laboratory's backups.
+
+``aqm.experiment`` edits use the same worker. Each handle is tied to a saved
+checkpoint and one experiment. If that checkpoint fails, dependent edits fail
+instead of silently being applied elsewhere.
+
+Check, wait and finish
+----------------------
+
+.. code-block:: python
+
+   aqm.upload_status()          # Read local job states, without waiting.
+   information = aqm.flush()   # Wait; keep the manager open.
+   aqm.close()                 # Stop new jobs and finish pending ones.
+
+``flush()`` waits for jobs submitted before the call. It returns the last
+submitted job's experiment ID, title and URL, or an empty dictionary if no jobs
+exist. Leaving a manager's ``with`` block also closes it.
+
+Both wait calls default to 120 seconds; choose a longer timeout if needed:
 
 .. code-block:: python
 
    information = aqm.flush(timeout=300)
 
-The default HTTP connection/read timeout pair is ``(5, 30)`` seconds. You can
-choose a different pair with ``request_timeout=(5, 60)`` when constructing the
-manager. An HTTP read timeout is not a guaranteed total upload duration.
+The default HTTP connection/read timeout pair is ``(5, 30)`` seconds. Pass
+``request_timeout=(5, 60)`` to the manager to change it. A read timeout is not
+a guaranteed maximum total upload duration.
 
-A wait timeout does **not** cancel an in-flight request. Inspect
-``aqm.upload_status()`` and call ``flush()`` or ``close()`` again later. Once a
-close was requested, the manager no longer accepts new saves or edits; create
-a fresh manager for subsequent work. These calls and submissions belong on
-the thread that created the manager, normally the notebook's execution thread.
+A wait timeout does not cancel an in-flight request. Check ``upload_status()``
+and call ``flush()`` or ``close()`` again later. After a close was requested, no
+new saves or edits are accepted; create a new manager for subsequent work.
+Use these methods on the thread that created the manager, normally the notebook
+execution thread.
 
-What if the server is unavailable?
-----------------------------------
-
-The local Labmate file is saved before uploading. A failed upload keeps its
-stable snapshot in ``data/.upload_queue/snapshot-...`` by default, and
-``flush()`` or ``close()`` raises a ``RuntimeError`` chained from the original
-error. ``upload_status()`` identifies the failed job and its error message.
-
-Successful snapshots are removed. Failed snapshots are not automatically
-retried, replayed after restart, or silently claimed to be uploaded. Retain
-them until you have checked the remote experiment and safely recovered the
-files you need. Do not delete your original data to clear an upload error.
-
-A remote operation can partly succeed before its connection fails. Inspect
-the server before manually repeating writes: comments and steps can duplicate.
-Queued experiment edits live only in memory; they have no disk-backed journal.
-
-A stopped kernel, power loss or process crash can interrupt jobs. No cleanup
-handler can guarantee delivery in those situations. Finish with ``aqm.close()``
-and keep normal local backups.
-
-Current boundaries
+If an upload fails
 ------------------
 
-* There is no automatic retry, durable edit journal, or restart recovery.
-* The asynchronous interface edits experiments, not resources.
-* Fresh server reads use the separate synchronous client.
+Your local Labmate save has already happened. Failed jobs retain their stable
+snapshots under ``data/.upload_queue/snapshot-...`` by default. ``flush()`` or
+``close()`` raises ``RuntimeError`` chained from the original error;
+``upload_status()`` includes the failure message. Successful snapshots are
+removed automatically.
+
+There is no automatic retry or restart recovery. Keep failed snapshots until
+you have inspected the remote experiment and recovered the files you need.
+Do not delete your original data to clear an upload error.
+
+A request may partly succeed before its connection fails. Check the server
+before repeating it manually: adding comments and steps can produce duplicates.
+Queued experiment edits are held in memory, not a durable on-disk journal.
+
+Before stopping Python
+----------------------
+
+Always finish with ``aqm.close()`` or use a ``with`` block. A kernel shutdown,
+power loss or process crash can interrupt transfers; no cleanup handler
+guarantees delivery in those circumstances. Preserve local backups.
+
+Other boundaries
+----------------
+
+* The asynchronous handle supports a small set of experiment edits, not
+  resource edits or fresh server reads.
+* Missing local HDF5 files are not downloaded automatically before analysis.
 * Attachment replacement is best-effort. If listing existing attachments fails,
-  the current synchronous uploader can fall back to creating another file.
-  Server-side hashes are required for reliable unchanged-content skipping;
-  equal file sizes alone are not a reliable content comparison.
-* API responses, record permissions, category IDs and available statuses depend
-  on the eLabFTW installation.
+  the uploader can fall back to creating another file. Reliable skipping of
+  unchanged contents needs a compatible server-side hash, not just equal sizes.
+* Record permissions, available statuses and category IDs depend on your server.
 * Filename generation and local acquisition semantics remain Labmate's
-  responsibility. See the rapid-loop note in :doc:`scripts`.
+  responsibility; see :doc:`scripts` for repeated acquisitions.
 
-Advanced: attach to an existing Labmate manager
------------------------------------------------
+Advanced: attach to a manager you already have
+----------------------------------------------
 
-Normally, use eLabmate's ``AcquisitionAnalysisManager``. If another integration
-already creates the Labmate manager, attach the bridge directly:
+The eLabLink manager needs no manual setup. If another integration creates your
+Labmate manager, attach an ``AsyncBridge`` directly instead:
 
 .. code-block:: python
 
-   from elabmate import AsyncElabBridge
+   from elablink import AsyncBridge
 
-   sync = AsyncElabBridge("My experiment")
-   sync.attach(existing_labmate_manager)
-   # Use the existing manager as usual.
-   sync.close()
+   uploads = AsyncBridge("My experiment")
+   uploads.attach(existing_labmate_manager)
+   # Use the existing manager normally.
+   uploads.close()
 
-Do not attach a second bridge to eLabmate's manager: it already has one. Hooks
-remain registered after a bridge is closed, so use a fresh manager when
-replacing it. The older synchronous ``ElabBridge`` remains available for
-existing callers; it does not itself make network calls asynchronous.
+Do not attach another bridge to eLabLink's manager: it already has one.
+Callbacks remain registered after closing a bridge, so use a fresh manager
+when replacing it. ``Bridge`` is the synchronous integration engine;
+``AsyncBridge`` schedules its server operations on the background worker.

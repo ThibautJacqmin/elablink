@@ -1,7 +1,10 @@
 """Acquire and plot a sinusoid, saving locally and uploading to eLabFTW.
 
-Running this script writes to the server in your configuration. Importing it does
-not acquire data or contact the server.
+Run from the project folder:
+    python examples/labmate_acquisition.py
+
+The configured eLabFTW server receives a Sinusoid experiment with the data,
+this script and the figure. Local files are kept in data/.
 
 Author: Thibaut Jacqmin
 """
@@ -12,16 +15,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from elabmate import AcquisitionAnalysisManager
+from elablink import AcquisitionAnalysisManager
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default="elabmate.conf")
+    parser.add_argument("--config", default="elablink.conf")
     parser.add_argument("--data", default="data")
     args = parser.parse_args(argv)
 
-    # Without a notebook cell, save this script as the acquisition/analysis code.
+    # In a script there are no notebook cells: save this file as the source code.
     source = Path(__file__).read_text(encoding="utf-8")
     with AcquisitionAnalysisManager(
         args.data, config_path=args.config, shell=None, use_magic=False
@@ -40,7 +43,13 @@ def main(argv=None):
         finally:
             plt.close(figure)
 
-        aqm.experiment.add_step("Sinusoid acquired and plotted.")
+        # This handle edits the experiment in the same background queue.
+        experiment = aqm.experiment
+        experiment.add_step("Sinusoid acquired and plotted.")
+        experiment.add_comment("The signal is stable.")
+        experiment.set_extra_fields({"Frequency (Hz)": 5})
+
+        # Wait at the end, not during acquisition; also report any upload error.
         info = aqm.flush()
         print(info["url"])
     return info

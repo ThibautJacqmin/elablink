@@ -5,10 +5,10 @@
 """
 
 from .exceptions import InvalidCategory
-from .experiment import ElabExperiment
+from .experiment import Experiment
 
 
-class ElabResource(ElabExperiment):
+class Resource(Experiment):
     """Represents an eLabFTW resource while sharing entity helpers."""
 
     entity_type = "items"
@@ -27,7 +27,7 @@ class ElabResource(ElabExperiment):
         self._load()
 
     def _category_values(self) -> dict[str, int]:
-        # The generated client version used by elabmate has no endpoint for
+        # The generated client version used by elablink has no endpoint for
         # enumerating resource categories. Numeric category IDs still work.
         return {}
 

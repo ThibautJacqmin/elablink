@@ -1,20 +1,20 @@
-"""Public API for elabmate.
+"""Public API for elablink.
 
 @author Thibaut Jacqmin
 """
 
 from typing import TYPE_CHECKING
 
-from .async_bridge import AsyncElabBridge
-from .async_experiment import AsyncElabExperiment
-from .bridge import ElabBridge
-from .client import ElabClient
-from .experiment import ElabExperiment
-from .resource import ElabResource
+from .async_bridge import AsyncBridge
+from .async_experiment import AsyncExperiment
+from .bridge import Bridge
+from .client import Client
+from .experiment import Experiment
+from .resource import Resource
 from .exceptions import (
     DeletedExperiment,
     DuplicateTitle,
-    ElabException,
+    ELabError,
     InvalidCategory,
     InvalidID,
     InvalidStatus,
@@ -24,15 +24,15 @@ from .exceptions import (
 
 __all__ = [
     "AcquisitionAnalysisManager",
-    "AsyncElabBridge",
-    "AsyncElabExperiment",
-    "ElabBridge",
-    "ElabClient",
-    "ElabExperiment",
-    "ElabResource",
+    "AsyncBridge",
+    "AsyncExperiment",
+    "Bridge",
+    "Client",
+    "Experiment",
+    "Resource",
     "DeletedExperiment",
     "DuplicateTitle",
-    "ElabException",
+    "ELabError",
     "InvalidCategory",
     "InvalidID",
     "InvalidStatus",
@@ -55,7 +55,7 @@ def __getattr__(name):
         except ModuleNotFoundError as exc:
             if exc.name == "labmate":
                 raise ModuleNotFoundError(
-                    "The eLabmate acquisition manager requires Labmate. Install your "
+                    "The eLabLink acquisition manager requires Labmate. Install your "
                     "local Labmate checkout in this Python environment using "
                     "pip install -e <path-to-labmate>.",
                     name="labmate",

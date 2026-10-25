@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from elabmate import AsyncElabBridge, AsyncElabExperiment
+from elablink import AsyncBridge, AsyncExperiment
 from tests.fakes import OfflineExperiment
 from tests.test_acquisition_analysis_manager import (
     HAS_LABMATE_HOOK,
@@ -94,7 +94,7 @@ class ExperimentTestCase(unittest.TestCase):
                 resource.close(timeout=5)
 
     def adapter(self, client):
-        bridge = AsyncElabBridge(
+        bridge = AsyncBridge(
             spool_directory=self.root / "spool",
             client_factory=lambda: client,
         )
@@ -132,7 +132,7 @@ class AsyncExperimentTests(ExperimentTestCase):
         bridge.enqueue(self.data())
         self.assertTrue(started.wait(timeout=3))
         experiment = bridge.experiment
-        self.assertIsInstance(experiment, AsyncElabExperiment)
+        self.assertIsInstance(experiment, AsyncExperiment)
         fields = {"temperature": {"value": 4, "unit": "K"}}
         futures = [
             experiment.add_step("Cool sample"),
@@ -293,7 +293,7 @@ class AsyncExperimentTests(ExperimentTestCase):
 @unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with analysis_figure_saved")
 class ManagerExperimentTests(ExperimentTestCase):
     def manager(self, client, **kwargs):
-        from elabmate import AcquisitionAnalysisManager
+        from elablink import AcquisitionAnalysisManager
 
         manager = AcquisitionAnalysisManager(
             str(self.root / "data"),

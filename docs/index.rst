@@ -1,47 +1,89 @@
-eLabmate
+eLabLink
 ========
 
-**Python measurements, lab notebook records.**
+Your eLabFTW notebook, from Python.
 
-eLabmate, written and maintained by **Thibaut Jacqmin**, connects Python to
-eLabFTW. Use it to manage experiments and resources directly, or to keep a remote
-copy of your Labmate acquisition data without waiting for network uploads.
-
-Choose your starting point
---------------------------
-
-* **I only need eLabFTW:** :doc:`elabftw_only` shows experiments, resources,
-  notes, custom fields, files and links. Labmate is not required.
-* **I acquire data in Jupyter:** :doc:`notebooks` keeps the usual Labmate cells.
-  Change the import, then finish with ``aqm.close()``.
-* **I run a Python script:** :doc:`scripts` shows the same workflow without
-  notebook-specific behaviour.
-
-The notebook interface starts with just:
+eLabLink, written and maintained by **Thibaut Jacqmin**, provides Python objects
+for familiar parts of the eLabFTW interface. Create an experiment or a resource,
+then edit its notes, steps, tags, custom fields and attachments.
 
 .. code-block:: python
 
-   from elabmate import AcquisitionAnalysisManager
+   from elablink import Experiment
+
+   experiment = Experiment(title="Laser calibration")
+   experiment.main_text = "<p>Measure the laser power.</p>"
+   experiment.add_step("Align the beam")
+   experiment.add_comment("The signal is stable.")
+
+These few lines create and edit a real server record. Prepare your private
+``elablink.conf`` first: :doc:`installation`.
+
+From the GUI to Python
+----------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - In eLabFTW
+     - In eLabLink
+   * - An experiment
+     - ``Experiment(...)``
+   * - A resource, such as a sample or instrument
+     - ``Resource(...)``
+   * - Title and main text
+     - ``record.title`` and ``record.main_text``
+   * - Add a step, comment or tag
+     - ``record.add_step(...)``, ``add_comment(...)``, ``add_tag(...)``
+   * - Custom fields, attached files and related records
+     - ``set_extra_fields(...)``, ``upload_file(...)``, ``link_resource(...)``
+
+The names follow the eLabFTW concepts. Not every GUI operation is implemented;
+see :doc:`features` for the precise scope. Start with
+:doc:`experiments_and_resources` for short examples.
+
+Also synchronise acquisition data
+---------------------------------
+
+`Labmate <https://kyrylo-gr.github.io/labmate/>`_ separates **acquisition** from
+**analysis** and keeps the saved data and code together. Its analysis workflow
+reads the saved data instead of relying on variables left in notebook memory.
+
+eLabLink's optional Labmate integration keeps that local workflow and sends
+saved data and figures to eLabFTW in the background. A slow network upload does
+not hold up your next acquisition cell. Only the manager import changes:
+
+.. code-block:: python
+
+   from elablink import AcquisitionAnalysisManager
 
    aqm = AcquisitionAnalysisManager("data")
 
-Set up your environment and ``elabmate.conf`` first: :doc:`installation`.
-The configuration file contains your API key; keep it out of Git.
+Follow :doc:`notebooks` for Jupyter and VS Code, or :doc:`scripts` for a normal
+Python script. Finish with ``aqm.close()`` to wait for uploads and report errors.
+Local file writes and snapshot copies still take time; the network work is
+asynchronous. See :doc:`background_uploads` for what happens if a transfer fails.
 
 .. toctree::
    :maxdepth: 2
    :caption: Get started
 
    installation
-   elabftw_only
+   experiments_and_resources
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Acquisition with Labmate
+
    notebooks
    scripts
+   background_uploads
 
 .. toctree::
    :maxdepth: 2
    :caption: Reference
 
-   background_uploads
    features
    api
    contributing

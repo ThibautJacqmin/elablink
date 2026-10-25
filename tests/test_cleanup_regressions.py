@@ -1,4 +1,4 @@
-"""Offline regressions for the eLabmate API cleanup."""
+"""Offline regressions for the eLabLink API cleanup."""
 
 import importlib
 import json
@@ -8,13 +8,13 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
-import elabmate
-from elabmate import (
+import elablink
+from elablink import (
     DuplicateTitle,
-    ElabBridge,
-    ElabClient,
-    ElabExperiment,
-    ElabResource,
+    Bridge,
+    Client,
+    Experiment,
+    Resource,
     InvalidCategory,
     InvalidTemplate,
 )
@@ -23,7 +23,7 @@ from elabmate import (
 class ClientCreationTests(unittest.TestCase):
     def setUp(self):
         # Build the wrapper without reading a configuration or opening a connection.
-        self.client = object.__new__(ElabClient)
+        self.client = object.__new__(Client)
         self.client.enforce_unique_titles = True
         self.client._team_id = 4
         self.client.experiments = Mock()
@@ -58,7 +58,7 @@ class ClientCreationTests(unittest.TestCase):
                 experiment = self.client.create_experiment_from_template(
                     *args, **kwargs
                 )
-                self.assertIsInstance(experiment, ElabExperiment)
+                self.assertIsInstance(experiment, Experiment)
                 self.assertEqual(experiment.ID, 17)
                 self.client.experiments.post_experiment_with_http_info.assert_called_once_with(
                     body={"template": 7}
@@ -145,7 +145,7 @@ class ClientCreationTests(unittest.TestCase):
 
 
 class MetadataValidationTests(unittest.TestCase):
-    def entity(self, entity_class=ElabExperiment):
+    def entity(self, entity_class=Experiment):
         api = Mock()
         entity = entity_class(api, 17)
         entity._cache = {"metadata": None}
@@ -153,7 +153,7 @@ class MetadataValidationTests(unittest.TestCase):
 
     def test_missing_empty_and_json_object_metadata_are_supported(self):
         values = [(None, {}), ("", {}), ({}, {}), ('{"sample": "A"}', {"sample": "A"})]
-        for entity_class in (ElabExperiment, ElabResource):
+        for entity_class in (Experiment, Resource):
             for raw, expected in values:
                 with self.subTest(entity=entity_class.__name__, raw=raw):
                     entity, _ = self.entity(entity_class)
@@ -161,7 +161,7 @@ class MetadataValidationTests(unittest.TestCase):
                     self.assertEqual(entity.metadata, expected)
 
     def test_metadata_dictionary_is_not_returned_as_the_cached_object(self):
-        for entity_class in (ElabExperiment, ElabResource):
+        for entity_class in (Experiment, Resource):
             with self.subTest(entity=entity_class.__name__):
                 entity, _ = self.entity(entity_class)
                 entity._cache["metadata"] = {"sample": "A"}
@@ -171,7 +171,7 @@ class MetadataValidationTests(unittest.TestCase):
 
     def test_malformed_or_non_object_server_metadata_raises(self):
         invalid = ["{broken", "[]", "null", "42", '"text"', [], 42]
-        for entity_class in (ElabExperiment, ElabResource):
+        for entity_class in (Experiment, Resource):
             for raw in invalid:
                 with self.subTest(entity=entity_class.__name__, raw=raw):
                     entity, _ = self.entity(entity_class)
@@ -180,14 +180,14 @@ class MetadataValidationTests(unittest.TestCase):
                         _ = entity.metadata
 
     def test_metadata_setter_accepts_dictionary_and_json_object(self):
-        for entity_class in (ElabExperiment, ElabResource):
+        for entity_class in (Experiment, Resource):
             for value in ({"sample": "A"}, '{"sample": "A"}'):
                 with self.subTest(entity=entity_class.__name__, value=value):
                     entity, api = self.entity(entity_class)
                     entity.metadata = value
                     endpoint = (
                         api.experiments.patch_experiment
-                        if entity_class is ElabExperiment
+                        if entity_class is Experiment
                         else api.items.patch_item
                     )
                     endpoint.assert_called_once()
@@ -195,7 +195,7 @@ class MetadataValidationTests(unittest.TestCase):
                     self.assertEqual(json.loads(body["metadata"]), {"sample": "A"})
 
     def test_invalid_metadata_is_rejected_before_any_server_write(self):
-        for entity_class in (ElabExperiment, ElabResource):
+        for entity_class in (Experiment, Resource):
             for value in ("{broken", "[]", "null", "42", '"text"'):
                 with self.subTest(entity=entity_class.__name__, value=value):
                     entity, api = self.entity(entity_class)
@@ -215,14 +215,14 @@ class MetadataValidationTests(unittest.TestCase):
 
 class CleanupContractTests(unittest.TestCase):
     def test_tag_removal_is_not_part_of_either_entity_api(self):
-        for entity_class in (ElabExperiment, ElabResource):
+        for entity_class in (Experiment, Resource):
             with self.subTest(entity=entity_class.__name__):
                 self.assertFalse(hasattr(entity_class, "remove_tag"))
                 self.assertFalse(hasattr(entity_class, "clear_tags"))
-        self.assertFalse(hasattr(elabmate, "InvalidTag"))
-        self.assertNotIn("InvalidTag", elabmate.__all__)
+        self.assertFalse(hasattr(elablink, "InvalidTag"))
+        self.assertNotIn("InvalidTag", elablink.__all__)
         self.assertFalse(
-            hasattr(importlib.import_module("elabmate.exceptions"), "InvalidTag")
+            hasattr(importlib.import_module("elablink.exceptions"), "InvalidTag")
         )
 
     def test_bridge_payload_tags_preserve_existing_tags(self):
@@ -231,7 +231,7 @@ class CleanupContractTests(unittest.TestCase):
             add_tag=lambda tag: tags.append(tag),
             clear_tags=Mock(side_effect=AssertionError("Tags must never be cleared")),
         )
-        bridge = ElabBridge(
+        bridge = Bridge(
             None,
             payload_builder=lambda acquisition, attachments, metadata: {
                 "title": acquisition.experiment_name,
@@ -248,7 +248,7 @@ class CleanupContractTests(unittest.TestCase):
         for metadata in ({"sample": "A"}, {}):
             with self.subTest(metadata=metadata):
                 experiment = SimpleNamespace(metadata={"old": True})
-                bridge = ElabBridge(None)
+                bridge = Bridge(None)
                 acquisition = SimpleNamespace(experiment_name="Measurement")
                 bridge.save_experiment(
                     acquisition, metadata=metadata, experiment=experiment
@@ -256,7 +256,7 @@ class CleanupContractTests(unittest.TestCase):
                 self.assertEqual(experiment.metadata, metadata)
 
     def test_unused_private_id_lookup_is_removed(self):
-        self.assertFalse(hasattr(ElabClient, "_has_ID"))
+        self.assertFalse(hasattr(Client, "_has_ID"))
 
     def test_importing_client_does_not_silence_process_wide_tls_warnings(self):
         # A fresh process avoids mutating module identities in the rest of the suite.
@@ -266,7 +266,7 @@ class CleanupContractTests(unittest.TestCase):
                 "-c",
                 "from unittest.mock import patch\n"
                 "with patch('urllib3.disable_warnings') as disable_warnings:\n"
-                "    import elabmate.client\n"
+                "    import elablink.client\n"
                 "    disable_warnings.assert_not_called()\n",
             ],
             capture_output=True,

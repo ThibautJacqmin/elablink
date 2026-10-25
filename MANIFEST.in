@@ -1,8 +1,12 @@
-include LICENSE AUTHORS.rst CITATION.cff README.md elabmate.conf.example
+include LICENSE AUTHORS.rst CITATION.cff README.md elablink.conf.example
 include .readthedocs.yaml
-include example_labmate_acquisition_analysis.py example_labmate_elabFTW_bridge.ipynb
+include examples/experiments_and_resources.py
+include examples/labmate_notebook.ipynb examples/labmate_acquisition.py
 recursive-include docs *.rst *.py *.txt *.css *.png
 recursive-exclude docs/_build *
-recursive-include examples *.py
+prune examples/data
+prune docs/_build
+global-exclude *.pyc *.pyo
+global-exclude *-checkpoint.*
 recursive-include tests *.py
 

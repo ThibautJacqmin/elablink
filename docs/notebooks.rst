@@ -1,12 +1,18 @@
-Notebook acquisition and analysis
-=================================
+Acquisition in a notebook
+=========================
 
-Use eLabmate's manager in place of Labmate's manager. Your local Labmate
-workflow stays the same; saved checkpoints are also queued for eLabFTW.
+`Labmate <https://kyrylo-gr.github.io/labmate/>`_ keeps acquisition and analysis
+separate: acquire once, then analyse the saved data without relying on variables
+left in memory. It stores data and code together so a measurement can be
+reopened later.
 
-Complete :doc:`installation` first, then run these four cells in order in
-Jupyter or VS Code. The notebook must run from a folder containing your
-``elabmate.conf``. Running these cells writes to your real eLabFTW server.
+eLabLink adds background uploads to that workflow. The local Labmate files
+remain your primary copy; saved data and figures are also sent to eLabFTW.
+Install and configure the projects as described in :doc:`installation` first.
+
+Open ``examples/labmate_notebook.ipynb`` in Jupyter or VS Code and select your
+Python environment. Its main cells are shown below. They write to your real
+server when run.
 
 1. Set up
 ---------
@@ -15,9 +21,13 @@ Jupyter or VS Code. The notebook must run from a folder containing your
 
    import numpy as np
    import matplotlib.pyplot as plt
-   from elabmate import AcquisitionAnalysisManager
+   from elablink import AcquisitionAnalysisManager
 
    aqm = AcquisitionAnalysisManager("data")
+
+Use eLabLink's manager instead of importing Labmate's manager. No extra hook
+or bridge setup is needed. Put ``elablink.conf`` in the notebook's working
+directory, or pass its location as ``config_path=...``.
 
 2. Acquire a sinusoid
 ---------------------
@@ -29,12 +39,11 @@ Jupyter or VS Code. The notebook must run from a folder containing your
    y = np.sin(2 * np.pi * 5 * t)
    aqm.save_acquisition(t=t, y=y)
 
-Labmate saves the data locally in the ``data/Sinusoid/`` folder. eLabmate
-captures a stable local copy and uploads it in the background. You can continue
-to the next cell while the server is busy.
+Labmate saves the run locally in ``data/Sinusoid/``. eLabLink captures a stable
+local copy and queues its upload. You can continue while the server is busy.
 
-3. Analyse and save a plot
---------------------------
+3. Analyse the saved data
+-------------------------
 
 .. code-block:: python
 
@@ -46,46 +55,65 @@ to the next cell while the server is busy.
    aqm.save_fig(name="sinusoid.png")
    plt.show()
 
-The figure and available saved code files are uploaded to the same experiment.
-Labmate also stores its acquisition and analysis information in the HDF5 file.
-Use the normal Labmate option ``save_files=True`` if you also want separate
-code/configuration files alongside the data.
+Read ``aqm.data`` rather than the earlier ``t`` and ``y`` variables. This makes
+the analysis work when you reopen the saved measurement in another session.
+The saved figure and updated data file are queued for the same experiment.
 
-4. Finish
----------
+4. Add a note and finish
+------------------------
 
 .. code-block:: python
 
+   experiment = aqm.experiment
+   experiment.add_step("Sinusoid acquired and plotted.")
+   experiment.add_comment("The signal is stable.")
+   information = aqm.flush()
+   print(information["url"])
    aqm.close()
 
-This last cell waits for pending uploads and experiment edits, and reports any
-failure. Run it before restarting or closing the kernel. After closing, create
-a **new** manager if you want to acquire more data.
+After a save, ``aqm.experiment`` retrieves an
+:class:`~elablink.async_experiment.AsyncExperiment`
+handle immediately; the edits run on the same background worker as the uploads.
+The handle stays bound to that experiment even if you start another acquisition.
+``flush()`` waits and returns the last submitted job's experiment ID, title and
+URL. ``close()`` waits too, and finishes the manager. Run it before shutting down
+or restarting the kernel; create a new manager for further acquisitions.
 
-The same four cells are provided in
-``example_labmate_elabFTW_bridge.ipynb`` and, with VS Code cell markers, in
-``example_labmate_acquisition_analysis.py`` at the repository root.
+More experiment edits
+---------------------
 
-Which experiment receives the data?
------------------------------------
+Before closing, the handle also supports:
 
-``aqm.acquisition_cell("Sinusoid")`` selects the experiment titled
-``Sinusoid``. Repeating this name in the same manager reuses the experiment;
-different run files remain separate attachments. Reuse across fresh managers
-follows ``UNIQUE_EXPERIMENTS_TITLES`` in your configuration.
+.. code-block:: python
 
-To send every acquisition to one specific experiment instead:
+   experiment.add_tag("calibration")
+   experiment.main_text = "<p>Sinusoidal signal measurement.</p>"
+   experiment.set_extra_fields({"Temperature (K)": 4.2})
+
+``main_text`` replaces the main text. This small, write-only handle is not the
+direct :class:`~elablink.experiment.Experiment` object: it does not fetch remote properties
+or attachments. For those operations, use ``Client`` separately as described in
+:doc:`experiments_and_resources`.
+
+Which eLabFTW experiment?
+-------------------------
+
+By default, the acquisition name ``Sinusoid`` selects the experiment title.
+Repeated names in one manager reuse its experiment; different run files remain
+separate attachments. Reuse across fresh managers follows
+``UNIQUE_EXPERIMENTS_TITLES`` in your configuration.
+
+To put everything into one existing experiment:
 
 .. code-block:: python
 
    aqm = AcquisitionAnalysisManager("data", experiment_id=123)
 
-Use ``experiment_title="My experiment"`` to choose a fixed title instead of
-following acquisition names. Both choices are optional; normally only the
-import changes.
+Use your real ID. Alternatively, ``experiment_title="My experiment"`` fixes the
+title instead of following each acquisition name.
 
-Reopen data for analysis
-------------------------
+Reanalyse an earlier measurement
+--------------------------------
 
 .. code-block:: python
 
@@ -94,46 +122,10 @@ Reopen data for analysis
    plt.plot(aqm.data.t, aqm.data.y)
    aqm.save_fig(name="reanalysis.png")
 
-Use a real local file path. Saving this new figure queues a checkpoint even if
-the acquisition happened in another notebook session. By default its data
-folder name selects the experiment; a fixed title or ID still overrides this.
-Keep the HDF5 file locally: automatic retrieval from eLabFTW is not part of
-this asynchronous manager.
+Use a real local file path. Saving the figure queues an updated checkpoint even
+when this manager did not acquire the data. By default, the data folder's name
+selects the experiment. Automatic retrieval of missing data from eLabFTW is not
+provided: keep your local files.
 
-Optional experiment notes
--------------------------
-
-After saving an acquisition or a figure, and **before closing**, access its
-experiment without waiting for the server:
-
-.. code-block:: python
-
-   experiment = aqm.experiment
-   experiment.add_step("Sample cooled to 4 K")
-   experiment.add_comment("Signal looks stable.")
-   experiment.add_tag("calibration")
-   experiment.main_text = "<p>Sinusoidal signal measurement.</p>"
-   experiment.set_extra_fields({"Temperature (K)": 4})
-
-These writes are queued after that handle's saved checkpoint. The handle stays
-bound to the selected experiment even if you start another acquisition.
-``main_text`` replaces the experiment's main text; ``body`` is an alias.
-``add_comment()`` appends a separate note.
-
-This is a small **write-only** interface, not a complete synchronous
-``ElabExperiment``. For remote reads or advanced operations, use a separate
-``ElabClient`` as shown in :doc:`elabftw_only`.
-
-Check progress or obtain a link
--------------------------------
-
-.. code-block:: python
-
-   aqm.upload_status()          # No server request and no wait.
-   information = aqm.flush()   # Wait, but keep the manager open.
-   print(information["url"])
-
-Call ``flush()`` only after submitting a save or edit if you need an experiment
-link. It returns the last submitted job's experiment information; with no jobs
-it returns an empty dictionary. See :doc:`background_uploads` for failures and
-timeouts.
+``aqm.upload_status()`` inspects progress without waiting or contacting the
+server. See :doc:`background_uploads` for timeouts and failures.

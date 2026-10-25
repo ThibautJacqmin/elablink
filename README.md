@@ -1,84 +1,88 @@
-# eLabmate
+# eLabLink
 
-<img src="docs/_static/elabmate-logo.png" alt="eLabmate: a physics laboratory notebook" width="180">
+<img src="docs/_static/elablink-logo.png" alt="An open physics laboratory notebook, an atom and a laser beam" width="180">
 
-Python measurements, lab notebook records.
+Work with your eLabFTW notebook from Python.
 
-eLabmate provides convenient Python access to eLabFTW experiments and resources, 
-with an optional Labmate manager that saves locally and uploads checkpoints in the background.
+eLabLink turns familiar eLabFTW concepts into Python objects: an `Experiment`
+for an experiment, a `Resource` for a sample or instrument, and properties and
+methods for notes, steps, tags, files and links. It is a practical interface to
+these parts of eLabFTW, not a replacement for every feature of its GUI.
 
-## Choose your workflow
+```python
+from elablink import Experiment, Resource
 
-- [eLabFTW only](docs/elabftw_only.rst): create experiments/resources, edit notes
-  and custom fields, add steps/comments/tags, attach files and link records.
-- [Jupyter acquisition](docs/notebooks.rst): keep Labmate's familiar acquisition
-  and analysis cells, with automatic background uploads.
-- [Python script acquisition](docs/scripts.rst): the same saves without a
-  notebook, including an executable sinusoid example.
+experiment = Experiment(title="Laser calibration")
+experiment.main_text = "<p>Measure the laser power.</p>"
+experiment.add_step("Align the beam")
+experiment.add_comment("The signal is stable.")
 
-## Installation
+laser = Resource(title="Blue laser", category=3)  # Your resource category ID.
+laser.set_extra_fields({"Wavelength (nm)": 405})
+experiment.link_resource(laser.ID)
+```
 
-Python 3.10 or newer is required. From this checkout, install in editable
-(developer) mode:
+These calls modify your server immediately. First install the project and
+create your private `elablink.conf`: [installation](docs/installation.rst).
+The [experiment and resource guide](docs/experiments_and_resources.rst) explains
+loading existing records, editing properties and attaching files.
+
+## Acquisition and analysis with Labmate
+
+[Labmate](https://kyrylo-gr.github.io/labmate/) separates data acquisition from
+analysis and keeps the saved data and code together. eLabLink adds a second
+copy in eLabFTW: local saves happen first, then network uploads run in the
+background, so a slow server does not hold up the next acquisition cell.
+
+```python
+from elablink import AcquisitionAnalysisManager
+
+aqm = AcquisitionAnalysisManager("data")
+```
+
+Use Labmate's usual acquisition and analysis calls, then `aqm.close()` to finish
+the uploads. After a save, `aqm.experiment.add_step("Measurement complete")`
+also queues a note without waiting for the network. See the
+[notebook guide](docs/notebooks.rst), [script guide](docs/scripts.rst) and
+[upload behaviour](docs/background_uploads.rst).
+
+## Three examples
+
+- [Experiments and resources](examples/experiments_and_resources.py): create
+  records, edit their properties and link them.
+- [Labmate notebook](examples/labmate_notebook.ipynb): acquire a sinusoid and
+  save its plot in Jupyter or VS Code.
+- [Labmate script](examples/labmate_acquisition.py): the same workflow in Python,
+  including access to the eLabFTW experiment.
+
+## Installation and documentation
+
+From this checkout, in the Python environment you use:
 
 ```console
 python -m pip install --use-pep517 -e .
 ```
 
-Labmate is optional for direct eLabFTW use. Acquisition integration requires
-Labmate with the `analysis_figure_saved` lifecycle hook. For the neighbouring
-local checkouts, run this **in your notebook's environment**:
+Python 3.10 or newer is required. Labmate is optional for the direct eLabFTW
+interface; the acquisition guides explain its installation. In a notebook,
+use `%pip` in the kernel's environment and restart the kernel after installing.
 
-```python
-%pip install --use-pep517 -e "../labmate_kyrylo" -e "." numpy matplotlib
-```
-
-Then restart the kernel. See [installation and configuration](docs/installation.rst)
-for paths, packaging-tool troubleshooting and the required `elabmate.conf`.
-Keep your API key private and TLS certificate verification enabled.
-
-## A notebook starts with
-
-```python
-from elabmate import AcquisitionAnalysisManager
-
-aqm = AcquisitionAnalysisManager("data")
-```
-
-Use the usual `acquisition_cell()`, `save_acquisition()`, `analysis_cell()` and
-`save_fig()` calls. Finish with `aqm.close()` to wait for uploads and report
-failures. The [four-cell sinusoid notebook](example_labmate_elabFTW_bridge.ipynb)
-is ready to try, as is the [VS Code cell script](example_labmate_acquisition_analysis.py).
-
-Local writes and stable snapshot copies happen before background networking.
-There is no automatic retry or restart recovery; read the
-[failure and timeout guide](docs/background_uploads.rst) before an acquisition
-campaign. The existing synchronous `ElabBridge` remains available for advanced
-callers, but the manager above is the recommended notebook interface.
-
-## Documentation and tests
-
-The Sphinx documentation is ready for Read the Docs through `.readthedocs.yaml`.
-To build it locally with Python 3.12:
+The documentation is configured for Read the Docs. Build it locally with
+Python 3.12:
 
 ```console
 python -m pip install --use-pep517 -e . -r docs/requirements.txt
 python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
-Open `docs/_build/html/index.html`. Documentation builds do not run the examples
-or connect to a server. See [development](docs/contributing.rst) for offline
-tests; run live-server tests only deliberately.
+Open `docs/_build/html/index.html`. Building the documentation does not run the
+examples or contact a server. See [development](docs/contributing.rst) for tests.
 
 ## Author and acknowledgements
 
-Thibaut Jacqmin is the original author and maintainer. Improvements, tests and
-documentation have also received AI-assisted coding support under his direction.
-The repository history and existing licence notices are preserved.
+eLabLink is written and maintained by **Thibaut Jacqmin**. See
+[authorship](AUTHORS.rst), [credits](docs/about.rst), [citation](CITATION.cff)
+and the [MIT licence](LICENSE).
 
-eLabmate uses [eLabFTW](https://www.elabftw.net/),
-[elabapi-python](https://github.com/elabftw/elabapi-python) and, optionally,
-[Labmate](https://github.com/kyrylo-gr/labmate). These are independent projects
-with their own authors and licences; eLabmate does not imply their endorsement.
-See [about and credits](docs/about.rst), [citation metadata](CITATION.cff),
-[authorship](AUTHORS.rst), and the existing [licence](LICENSE).
+eLabFTW, elabapi-python and Labmate are independent projects with their own
+authors and licences. eLabLink is not an official product of those projects.

@@ -6,20 +6,20 @@ BASE_DIR = Path(__file__).resolve().parent
 README = (BASE_DIR / "README.md").read_text(encoding="utf-8")
 
 setup(
-    name="elabmate",
+    name="elablink",
     version="0.1.0",
     description="Python helpers for eLabFTW and asynchronous Labmate acquisition uploads",
     long_description=README,
     long_description_content_type="text/markdown",
     author="Thibaut Jacqmin",
     maintainer="Thibaut Jacqmin",
-    url="https://github.com/ThibautJacqmin/elabmate",
+    url="https://github.com/ThibautJacqmin/eLabLink",
     project_urls={
-        "Source": "https://github.com/ThibautJacqmin/elabmate",
-        "Issues": "https://github.com/ThibautJacqmin/elabmate/issues",
+        "Source": "https://github.com/ThibautJacqmin/eLabLink",
+        "Issues": "https://github.com/ThibautJacqmin/eLabLink/issues",
     },
     license_expression="MIT",
-    packages=find_packages(exclude=("tests", "examples")),
+    packages=find_packages(include=("elablink", "elablink.*")),
     python_requires=">=3.10",
     install_requires=[
         "elabapi-python",

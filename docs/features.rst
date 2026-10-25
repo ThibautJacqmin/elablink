@@ -4,51 +4,55 @@ Feature overview
 Direct eLabFTW interface
 ------------------------
 
-``ElabClient`` creates experiments, creates experiments from named templates,
-loads experiments by ID or exact title, and provides experiment title,
-category and status dictionaries. It also creates and loads resources/items
-and provides resource title and status dictionaries.
-
-``ElabExperiment`` and ``ElabResource`` share these helpers:
+``Experiment`` represents an experiment. ``Resource`` represents a resource
+or inventory item. Both can be created directly, or obtained through ``Client``.
+They share these operations:
 
 .. list-table::
    :header-rows: 1
    :widths: 25 75
 
-   * - Area
-     - Implemented operations
-   * - Properties
-     - Read/change title, main text, category, status and started-on date;
-       read creation/modification timestamps; refresh cached values.
+   * - eLabFTW concept
+     - Python interface
+   * - Title and main text
+     - Read/write ``title`` and ``main_text`` (also ``body``).
+   * - Category and status
+     - Read/write ``category`` and ``status`` using existing choices.
+   * - Dates
+     - Read/write the started-on ``date``; read creation/modification timestamps.
    * - Custom fields
-     - Read/write metadata and create/update typed extra fields.
+     - Read/write ``metadata``; create/update typed fields with ``set_extra_fields``.
    * - Steps
-     - List, append and ensure steps; set completion through ``ensure_step``;
-       select repeated labels by occurrence.
+     - List, append and ensure steps; set completion through ``ensure_step``.
    * - Comments
      - List and append comments.
    * - Tags
-     - List, check and add tags. Tag removal is intentionally not provided.
-   * - Attachments
-     - Upload, replace by filename, list, locate by filename and download;
-       skip unchanged contents when compatible server hashes are available.
-   * - Images
-     - Upload images, obtain download URLs and generate inline HTML.
-   * - Links
-     - Link experiments/resources and skip links already present.
+     - List, check and add tags. No tag-removal helper is provided.
+   * - Attached files
+     - Upload, replace by filename, list, find by filename and download.
+   * - Inline images
+     - Upload an image and obtain HTML for inserting into the main text.
+   * - Related records
+     - Link experiments/resources, skipping links already present.
 
-Resource categories require numeric IDs; experiment categories accept names
-or IDs. There is no resource-template helper. Inline-image HTML must be
-inserted into the main text explicitly.
+``Client`` creates/loads experiments and resources, creates experiments from
+existing named templates, and exposes title/category/status dictionaries.
+Loads accept a numeric ID or exact title. Properties are cached; ``refresh()``
+fetches the current record.
 
-Acquisition interface
----------------------
+Resource categories take numeric IDs; experiment categories and status setters
+accept existing names or IDs. There is no resource-template helper.
+Attachment hashes can avoid reuploading unchanged contents when supported by
+the server. See :doc:`background_uploads` for limits.
 
-``AcquisitionAnalysisManager`` preserves the usual Labmate workflow while
-adding background checkpoints, experiment routing, upload-state inspection,
-explicit waiting/closing and context-manager support.
+Labmate integration
+-------------------
 
-Its ``experiment`` handle supports the following **queued writes only**:
+``AcquisitionAnalysisManager`` keeps the current Labmate acquisition/analysis
+workflow and adds background checkpoints, experiment routing, upload-state
+inspection, waiting/closing and context-manager support.
+
+Its ``experiment`` property returns an ``AsyncExperiment`` with queued writes:
 
 .. code-block:: python
 
@@ -56,17 +60,16 @@ Its ``experiment`` handle supports the following **queued writes only**:
    experiment.add_comment("...")
    experiment.add_tag("...")
    experiment.main_text = "..."
-   experiment.body = "..."  # Same property, not additional text.
-   experiment.set_extra_fields({"Temperature (K)": 4})
+   experiment.set_extra_fields({"Temperature (K)": 4.2})
 
-Other operations require the direct, synchronous interface. No asynchronous
-resource handle is provided. See :doc:`background_uploads` for the reliability
-boundaries.
+``body`` is an alias for ``main_text``. The handle stays bound to its experiment.
+Use the direct interface for remote reads and other operations. No asynchronous
+resource handle is provided.
 
-Not implemented
----------------
+Not every GUI operation
+-----------------------
 
-There are no high-level helpers for deleting records/tags, unlinking records,
-permission or lock management, advanced search/pagination, or administering
-templates, categories and statuses. The underlying generated API is broader,
-but it is not the same as eLabmate providing a supported convenience helper.
+There are no high-level helpers for deleting records or tags, unlinking records,
+permissions/locks, advanced search/pagination, or administration of templates,
+categories and statuses. The generated eLabFTW API client is broader; that does
+not make every endpoint a supported eLabLink convenience method.

@@ -1,61 +1,83 @@
-Acquisition from a Python script
-================================
+Acquisition in a Python script
+==============================
 
-A notebook is not required. Use the same manager, but explicitly disable the
-IPython shell and magic commands:
+Use the same local-save, background-upload workflow outside Jupyter. The
+example ``examples/labmate_acquisition.py`` generates a sinusoid, saves the data
+and a PNG, adds a step and comment to the eLabFTW experiment, and prints its link.
+
+After :doc:`installation`, run it from the project root:
+
+.. code-block:: console
+
+   python examples/labmate_acquisition.py
+
+To choose another configuration or data directory:
+
+.. code-block:: console
+
+   python examples/labmate_acquisition.py --config path/to/elablink.conf --data measurements
+
+The example modifies your real server only when run. Importing it does not
+start an acquisition.
+
+.. literalinclude:: ../examples/labmate_acquisition.py
+   :language: python
+
+What changes outside a notebook?
+--------------------------------
+
+``shell=None`` and ``use_magic=False`` disable notebook-specific behaviour.
+A plain Python process has no current notebook cell, so the example reads its
+own source and passes it with ``cell=source``. This keeps the actual
+acquisition and analysis code with the saved data.
+
+The ``with`` block closes the manager on exit and waits for pending uploads.
+A normal exit reports an upload failure. If the acquisition already raised an
+exception, that original exception is preserved and an additional upload failure
+is logged.
+
+Access the experiment
+---------------------
+
+After ``save_acquisition()`` or ``save_fig()``, use the same handle as in a
+notebook:
 
 .. code-block:: python
 
-   with AcquisitionAnalysisManager("data", shell=None, use_magic=False) as aqm:
-       # Acquire and analyse here.
-       ...
+   experiment = aqm.experiment
+   experiment.add_step("Measurement complete")
+   experiment.add_comment("Laser power checked after the measurement.")
+   experiment.set_extra_fields({"Power (mW)": 2.5})
 
-The context manager waits for uploads when it exits. A normal exit reports an
-upload failure. If your acquisition already raised an exception, that original
-exception is preserved and an additional upload failure is logged.
+These edits are queued and do not wait for the network. Use ``aqm.flush()``
+inside the ``with`` block when you need confirmation or the experiment link:
 
-Run the complete example
-------------------------
+.. code-block:: python
 
-From the repository root, with your configuration ready:
+   information = aqm.flush()
+   print(information["url"])
 
-.. code-block:: console
+For synchronous reads or further operations after the manager closes, load the
+record through a separate client using the returned ID:
 
-   python examples/acquisition_script.py
+.. code-block:: python
 
-Or choose another data directory and configuration:
+   from elablink import Client
 
-.. code-block:: console
+   experiment = Client().load_experiment(ID=information["id"])
+   print(experiment.steps)
 
-   python examples/acquisition_script.py --data measurements --config path/to/elabmate.conf
+This last read waits for the server, like the direct API examples. Use the same
+configuration path if you selected a nondefault one.
 
-This example generates a sinusoid, saves the HDF5 data, saves a PNG, adds a note,
-and prints the eLabFTW experiment link. It modifies your real server only when
-run, not when imported or when building this documentation.
+Timing and repeated acquisitions
+--------------------------------
 
-.. literalinclude:: ../examples/acquisition_script.py
-   :language: python
+Network transfers are asynchronous, but local Labmate saves and snapshot
+copies still take time. Keep the data directory on a local disk.
 
-Keep the source with the data
------------------------------
-
-In Jupyter, Labmate can retrieve the current cell. A plain Python process has
-no current notebook cell, so the example reads its own source and passes it
-explicitly with ``cell=script_source``. This preserves the actual acquisition
-and analysis code rather than pretending automatic cell capture is available.
-
-``shell=None`` and ``use_magic=False`` make the script independent of Jupyter.
-No path injection, environment activation helper or example-specific bridge
-setup is needed: install both projects into the Python environment you use to
-run the script.
-
-Fast acquisition loops
-----------------------
-
-Labmate's notebook-style ``acquisition_cell()`` uses second-resolution run
-timestamps. It is not a safe way to create multiple independent same-name
-runs within one second. This integration deliberately does not change that
-upstream behaviour. For a rapid loop, use Labmate's documented collision-aware
-``create_acquisition()`` workflow and check which lifecycle saves it emits for
-your use case before relying on remote copies. A script example is not a
-promise that every possible Labmate loop pattern is automatically integrated.
+Labmate's notebook-style ``acquisition_cell()`` names runs with second-resolution
+timestamps. Repeating the same name within one second is not a way to create
+independent files. This integration preserves Labmate's filename behaviour;
+check its `acquisition documentation <https://kyrylo-gr.github.io/labmate/>`_
+before adapting this simple example into a rapid acquisition loop.

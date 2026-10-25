@@ -6,14 +6,14 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
-from elabmate import ElabExperiment, ElabResource
+from elablink import Experiment, Resource
 
 
 class EntityHelperTests(unittest.TestCase):
     def entity(self, resource=False):
         api = Mock()
         api.configuration.host = "https://lab.example/api/v2"
-        entity = (ElabResource if resource else ElabExperiment)(api, 17)
+        entity = (Resource if resource else Experiment)(api, 17)
         data = {"body": "", "steps": [], "metadata": "{}"}
         entity._cache = data
         if resource:

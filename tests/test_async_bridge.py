@@ -10,8 +10,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from elabmate import AsyncElabBridge
-from elabmate.async_bridge import _set_request_timeouts
+from elablink import AsyncBridge
+from elablink.async_bridge import _set_request_timeouts
 
 from tests.fakes import OfflineClient
 
@@ -49,7 +49,7 @@ class BridgeTestCase(unittest.TestCase):
                 adapter.close(timeout=3)
 
     def adapter(self, client, **kwargs):
-        adapter = AsyncElabBridge(
+        adapter = AsyncBridge(
             "offline example",
             config_path=self.root / "not-read.conf",
             spool_directory=self.root / "spool",
@@ -68,7 +68,7 @@ class AsyncBridgeTests(BridgeTestCase):
 
     def test_configuration_file_is_required_without_a_custom_factory(self):
         with self.assertRaises(FileNotFoundError):
-            AsyncElabBridge(
+            AsyncBridge(
                 "Sinusoid",
                 config_path=self.root / "missing.conf",
                 spool_directory=self.root / "spool",
@@ -89,11 +89,11 @@ class AsyncBridgeTests(BridgeTestCase):
 
         with (
             patch(
-                "elabmate.async_bridge.ElabClient", side_effect=make_client
+                "elablink.async_bridge.Client", side_effect=make_client
             ) as factory,
-            patch("elabmate.async_bridge._set_request_timeouts") as set_timeouts,
+            patch("elablink.async_bridge._set_request_timeouts") as set_timeouts,
         ):
-            adapter = AsyncElabBridge(
+            adapter = AsyncBridge(
                 "Sinusoid", config_path=config, spool_directory=self.root / "spool"
             )
             self.adapters.append(adapter)
@@ -136,7 +136,7 @@ class AsyncBridgeTests(BridgeTestCase):
             side_effect=ConnectionError("server unavailable")
         )
         adapter = self.adapter(client)
-        with self.assertLogs("elabmate.async_bridge", level="ERROR"):
+        with self.assertLogs("elablink.async_bridge", level="ERROR"):
             with self.assertRaisesRegex(ValueError, "analysis failed"):
                 with adapter:
                     adapter.enqueue(self.data())

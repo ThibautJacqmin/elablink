@@ -1,6 +1,6 @@
 :root {
-    --elabmate-ink: #143d48;
-    --elabmate-accent: #bb673b;
+    --elablink-ink: #143d48;
+    --elablink-accent: #bb673b;
 }
 
 body {
@@ -13,7 +13,7 @@ div.body {
 }
 
 h1, h2, h3, h4, div.sphinxsidebar h3 {
-    color: var(--elabmate-ink);
+    color: var(--elablink-ink);
 }
 
 a, div.sphinxsidebar a {
@@ -21,7 +21,7 @@ a, div.sphinxsidebar a {
 }
 
 a:hover, div.sphinxsidebar a:hover {
-    color: var(--elabmate-accent);
+    color: var(--elablink-accent);
 }
 
 div.admonition {

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Experiment helper for the eLabFTW API.
 
-This module defines :class:`ElabExperiment`, a convenience wrapper around
+This module defines :class:`Experiment`, a convenience wrapper around
 remote eLabFTW experiments and their attachments, tags, steps, and comments.
 
 @author Thibaut Jacqmin
@@ -19,26 +19,65 @@ from typing import Any, Mapping, Optional
 from urllib.parse import urlencode
 
 
-class ElabExperiment:
+class Experiment:
     """Represents a remote eLabFTW experiment with convenience helpers."""
 
     entity_type = "experiments"
 
     def __init__(
         self,
-        api,
+        api=None,
         ID: int = None,  # use ID instead of id (python built in function)
-        **kwargs,
+        *,
+        title: str = None,
+        category: str | int = None,
+        config_path: str = "elablink.conf",
     ):
-        """Create an experiment wrapper bound to an API client.
+        """Create a record, or open an existing record by ID.
 
         Args:
-            api: An :class:`ElabClient` instance.
-            ID: Experiment identifier on the server.
+            api: Optional shared :class:`Client`. Otherwise read ``config_path``.
+            ID: Existing record identifier. Omit to create a new record.
+            title: Title for a new record; defaults to "Untitled experiment"
+                ("Untitled resource" for resources).
+            category: Category for a new record; resource categories use numeric IDs.
+            config_path: Configuration file used when ``api`` is omitted.
+
+        New records are created immediately on the server. Supplying both ``api``
+        and ``ID`` binds a wrapper without fetching; this is also used by Client.
         """
+        if ID is not None and (title is not None or category is not None):
+            raise ValueError(
+                "Use either ID to open a record or title/category to create one"
+            )
+        load_existing = api is None and ID is not None
+        if api is None:
+            from .client import Client
+
+            api = Client(config_path)
+        entity = None
+        if load_existing:
+            load = (
+                api.load_resource if self.entity_type == "items" else api.load_experiment
+            )
+            entity = load(ID=ID)
+        elif ID is None:
+            create = (
+                api.create_resource if self.entity_type == "items" else api.create_experiment
+            )
+            default_title = (
+                "Untitled resource" if self.entity_type == "items" else "Untitled experiment"
+            )
+            entity = create(
+                title=default_title if title is None else title, category=category
+            )
+        if entity is not None:
+            ID = entity.ID
         self.api = api
         self.ID = ID
-        self._cache: Optional[dict[str, Any]] = None
+        self._cache: Optional[dict[str, Any]] = (
+            entity._cache if entity is not None else None
+        )
 
     def _load(self):
         """Fetch the experiment data from the server and refresh cache."""

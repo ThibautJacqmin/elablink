@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping, Union
 
 
 if TYPE_CHECKING:
-    from .async_bridge import AsyncElabBridge
+    from .async_bridge import AsyncBridge
 
 
-class AsyncElabExperiment:
+class AsyncExperiment:
     """Queue experiment edits without waiting for the eLabFTW server.
 
     Obtain a handle from ``aqm.experiment`` after saving an acquisition or figure.
@@ -23,7 +23,7 @@ class AsyncElabExperiment:
     ``aqm.close()``. Text assignment is queued too, not confirmed immediately.
 
     Only the documented writes are supported. This is not a synchronous
-    ``ElabExperiment``: reading remote properties would require a network wait.
+    ``Experiment``: reading remote properties would require a network wait.
     Pending edits live in memory and are not replayed after a kernel restart.
     """
 
@@ -31,7 +31,7 @@ class AsyncElabExperiment:
 
     def __init__(
         self,
-        bridge: AsyncElabBridge,
+        bridge: AsyncBridge,
         key: Union[str, int],
         title: str,
         prerequisite: Future,
@@ -69,7 +69,7 @@ class AsyncElabExperiment:
         """Write-only experiment text; reading fresh server data is not implicit."""
         raise AttributeError(
             "main_text is write-only on an async experiment handle; "
-            "reading fresh server data requires synchronous ElabClient access"
+            "reading fresh server data requires synchronous Client access"
         )
 
     @main_text.setter

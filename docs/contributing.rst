@@ -1,56 +1,63 @@
 Development and documentation
 =============================
 
-eLabmate is authored and maintained by Thibaut Jacqmin. Keep contributions
-small, readable and appropriate for laboratory users; preserve attribution
-and existing third-party notices.
+eLabLink is authored and maintained by Thibaut Jacqmin. Keep changes small,
+readable and appropriate for students using laboratory code. Preserve authorship
+and third-party notices.
 
-Run offline checks
-------------------
+Run offline tests
+-----------------
 
-From the repository root:
+From the project root, with the current Labmate checkout and the plotting
+dependencies installed:
 
 .. code-block:: console
 
-   python -m unittest tests.test_async_bridge tests.test_acquisition_analysis_manager tests.test_async_experiment tests.test_entity_helpers
+   python run_tests.py
 
-The Labmate-related tests need the compatible Labmate installation described
-in :doc:`installation`. Tests for the direct entity helpers do not need a live
-server. Review a live integration test before running it: such tests can create
-or change real records. Do not run unrestricted test discovery against a
-configured production server.
+The default suite uses fake clients and temporary files, not server credentials.
+Live integration tests are skipped unless ``ELABLINK_LIVE_TESTS=1`` is explicitly
+set. Leave that variable unset for offline testing.
 
-Build this documentation
--------------------------
+To deliberately test a disposable server, first review
+``tests/test_elab_experiment.py``. It requires ``ELABLINK_CONFIG`` pointing to
+a test configuration; the resource test also requires
+``ELABLINK_RESOURCE_CATEGORY_ID``. These tests create real records and leave
+them for inspection. Do not point them at a production configuration by accident.
 
-Use Python 3.12 for documentation, matching the Read the Docs configuration.
-The package itself also supports Python 3.10, but the documentation toolchain
-has a newer Python requirement.
+Build the documentation
+-----------------------
+
+Use Python 3.12, matching the Read the Docs configuration:
 
 .. code-block:: console
 
    python -m pip install --use-pep517 -e . -r docs/requirements.txt
    python -m sphinx -W --keep-going -b html docs docs/_build/html
 
-Open ``docs/_build/html/index.html``. This build imports the library for API
-documentation, but does not instantiate a client or execute example code.
-Labmate is mocked for autodoc, so a core-only installation can build the docs.
+Open ``docs/_build/html/index.html``. Sphinx imports the library for API
+documentation but does not instantiate clients or run examples. Labmate is
+mocked for autodoc, so the documentation can also build with only the core
+package installed. ``-W`` reports documentation warnings as failures.
+
+Keep three examples
+-------------------
+
+* ``examples/experiments_and_resources.py``: direct eLabFTW record operations.
+* ``examples/labmate_notebook.ipynb``: acquisition and analysis in Jupyter.
+* ``examples/labmate_acquisition.py``: the equivalent standalone Python workflow.
+
+Keep their imports and explanations short. No example-specific helper module
+is needed. Store user-generated data and private configuration outside the
+tracked examples.
 
 Publish on Read the Docs
 ------------------------
 
-The repository includes ``.readthedocs.yaml`` using the
-`Read the Docs v2 configuration format
-<https://docs.readthedocs.com/platform/stable/config-file/v2.html>`_. Import
-the GitHub repository into your own Read the Docs account and select the branch
-you want to publish. The service installs the package and
-``docs/requirements.txt``, then builds ``docs/conf.py``.
+The repository includes ``.readthedocs.yaml``. Import the GitHub repository into
+your Read the Docs account, select the branch to build and let the service
+install the package and ``docs/requirements.txt``. It then builds ``docs/conf.py``.
 
-Never add an API key or a production configuration to the documentation build.
-The guides display examples; they do not run them. Publishing requires the
-repository owner's account and is separate from preparing these source files.
-
-The API pages use Sphinx's
-`autodoc extension <https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html>`_
-with Napoleon for Google-style docstrings. A warnings-as-errors build catches
-broken internal references and missing included example files before publishing.
+Never give the documentation build an API key or a production configuration.
+Preparing these files does not itself publish a site; publication is controlled
+through the repository owner's Read the Docs account.

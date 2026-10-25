@@ -33,7 +33,7 @@ class OfflineClient:
         self.created += 1
         return self.experiment
 
-    def load_experiment(self, *, ID):  # noqa: N803 - ElabClient API
+    def load_experiment(self, *, ID):  # noqa: N803 - Client API
         if ID != self.experiment.ID:
             raise ValueError("The offline client only provides experiment 1")
         return self.experiment
