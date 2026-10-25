@@ -34,6 +34,9 @@ loading existing records, editing properties and attaching files.
 analysis and keeps the saved data and code together. eLabLink adds a second
 copy in eLabFTW: local saves happen first, then network uploads run in the
 background, so a slow server does not hold up the next acquisition cell.
+Labmate stores the acquisition/analysis cell code or script source with the
+data in HDF5. Saved files can later be downloaded through the direct API and
+reopened with Labmate; automatic retrieval by the manager is not provided.
 
 ```python
 from elablink import AcquisitionAnalysisManager

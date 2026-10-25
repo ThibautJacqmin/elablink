@@ -11,14 +11,10 @@ After :doc:`installation`, run it from the project root:
 
    python examples/labmate_acquisition.py
 
-To choose another local data directory:
-
-.. code-block:: console
-
-   python examples/labmate_acquisition.py --data measurements
-
-The example modifies your real server only when run. Importing it does not
-start an acquisition.
+This is a linear script: edit ``"data"`` or the signal parameters directly
+when adapting it to your measurement. There is no command-line parser or
+``main()`` function. Running or importing it starts the acquisition and writes
+to your configured server; read it first.
 
 .. literalinclude:: ../examples/labmate_acquisition.py
    :language: python

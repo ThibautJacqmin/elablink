@@ -1,21 +1,23 @@
 eLabLink
 ========
 
-Your eLabFTW notebook, from Python. eLabLink helps you to use programmatically the online scientific lab book
-directly in your python experimental sequences.
+Your eLabFTW notebook, from Python. eLabLink lets you use your online scientific
+lab notebook directly in your Python experimental sequences.
 
-First, eLabLink provides Python objects  that map the eLabFTW 
+First, eLabLink provides Python objects that map familiar parts of the eLabFTW
 interface. Create an experiment or a resource,
 then edit its notes, steps, tags, custom fields and attachments.
 
-Second, it optionnaly provides tools to save and retrieve acquisition and analysis
-ipynb cells, or scripts together with acquisition and analysis data,
-from eLabFTW experiments
+Second, its optional Labmate integration saves acquisition and analysis code
+from notebook cells or scripts together with measurement data in a HDF5
+(``.h5``) file. eLabLink attaches the saved files and figures to your eLabFTW
+experiment asynchronously, without waiting for the network before your next
+acquisition cell. Local saves and snapshot copies still take time.
 
-This is done by using the labmate Python module. Your data and acquisition, and analysis codes
-are then gather in a .h5 file and attached to your eLabFTW experiment asynchronously, without
-blocking your next acquisition cell. 
-
+You can later download the saved files from the experiment and reopen the HDF5
+data with Labmate. Downloads use the direct API; the acquisition manager does
+not retrieve missing files automatically. Notebook cell source is stored, not
+the complete ``.ipynb`` document.
 
 .. code-block:: python
 
@@ -76,6 +78,7 @@ Local file writes and snapshot copies still take time; the network work is
 asynchronous. See :doc:`background_uploads` for what happens if a transfer fails.
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Get started
 
@@ -83,6 +86,7 @@ asynchronous. See :doc:`background_uploads` for what happens if a transfer fails
    experiments_and_resources
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Acquisition with Labmate
 
@@ -91,6 +95,7 @@ asynchronous. See :doc:`background_uploads` for what happens if a transfer fails
    background_uploads
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Reference
 

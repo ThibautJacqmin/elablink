@@ -48,8 +48,10 @@ Keep three examples
 * ``examples/labmate_acquisition.py``: the equivalent standalone Python workflow.
 
 Keep their imports and explanations short. No example-specific helper module
-is needed. Store user-generated data and private configuration outside the
-tracked examples.
+is needed. The Python examples are linear, executable scripts: no ``main()``
+function, main guard, argument parser or configuration handling. Test them
+with fake clients rather than importing them against a real server.
+Store user-generated data and private configuration outside the tracked examples.
 
 Publish on Read the Docs
 ------------------------

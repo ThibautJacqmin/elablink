@@ -28,6 +28,6 @@ setup(
     ],
     extras_require={
         "labmate": ["labmate", "matplotlib"],
-        "docs": ["Sphinx>=8.2,<9"],
+        "docs": ["Sphinx>=8.2,<9", "sphinx-rtd-theme>=3.1,<4"],
     },
 )

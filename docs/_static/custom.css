@@ -8,19 +8,20 @@ body {
     background: #fbfaf7;
 }
 
-div.body {
+.wy-nav-content {
     background: #ffffff;
+    max-width: 1000px;
 }
 
-h1, h2, h3, h4, div.sphinxsidebar h3 {
+h1, h2, h3, h4 {
     color: var(--elablink-ink);
 }
 
-a, div.sphinxsidebar a {
+a {
     color: #116978;
 }
 
-a:hover, div.sphinxsidebar a:hover {
+a:hover {
     color: var(--elablink-accent);
 }
 
@@ -34,6 +35,16 @@ pre {
     border-radius: 5px;
 }
 
-div.sphinxsidebarwrapper p.logo img {
-    max-width: 210px;
+.wy-side-nav-search > a {
+    color: var(--elablink-ink);
+}
+
+.wy-side-nav-search > a img.logo {
+    max-width: 170px;
+    max-height: 130px;
+    width: auto;
+}
+
+.wy-menu-vertical p.caption {
+    color: #80cbc5;
 }

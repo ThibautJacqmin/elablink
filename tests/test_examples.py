@@ -1,62 +1,78 @@
 """Run the three examples without credentials or server access."""
 
 import contextlib
-import importlib.util
+import ast
 import io
 import json
 import os
+import runpy
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
 import warnings
 
-from elablink import Client, Experiment, Resource
+from elablink import Experiment, Resource
 from tests.fakes import OfflineClient
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def load_example(name):
-    spec = importlib.util.spec_from_file_location(
-        name, ROOT / "examples" / f"{name}.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def run_example(name):
+    return runpy.run_path(str(ROOT / "examples" / f"{name}.py"))
 
 
 class ExperimentResourceExampleTests(unittest.TestCase):
-    def test_import_does_not_create_a_client(self):
-        with patch("elablink.Client") as client:
-            load_example("experiments_and_resources")
-        client.assert_not_called()
+    def test_examples_are_linear_scripts_without_command_line_setup(self):
+        for name in ("experiments_and_resources", "labmate_acquisition"):
+            source = (ROOT / "examples" / f"{name}.py").read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            self.assertFalse(
+                any(
+                    isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    for node in ast.walk(tree)
+                )
+            )
+            self.assertNotIn("argparse", source)
+            self.assertNotIn('if __name__', source)
+            self.assertNotIn("config_path", source)
 
-    def test_creates_and_links_entities_with_explicit_resource_category(self):
-        example = load_example("experiments_and_resources")
-        client = Mock(spec=Client)
+    def test_notebook_code_stays_simple(self):
+        notebook = json.loads(
+            (ROOT / "examples" / "labmate_notebook.ipynb").read_text(encoding="utf-8")
+        )
+        for cell in notebook["cells"]:
+            if cell["cell_type"] != "code":
+                continue
+            source = "".join(cell["source"])
+            tree = ast.parse(source)
+            self.assertFalse(
+                any(
+                    isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    for node in ast.walk(tree)
+                )
+            )
+            self.assertNotIn("argparse", source)
+            self.assertNotIn('if __name__', source)
+            self.assertNotIn("config_path", source)
+
+    def test_creates_and_links_entities_with_visible_resource_category(self):
         experiment = Mock(spec=Experiment)
         experiment.ID = 11
         sample = Mock(spec=Resource)
         sample.ID = 21
-        client.create_experiment.return_value = experiment
-        client.create_resource.return_value = sample
-        with patch.object(example, "Client", return_value=client) as constructor:
-            with contextlib.redirect_stdout(io.StringIO()):
-                result = example.main(
-                    [
-                        "--title",
-                        "Test",
-                        "--resource-category",
-                        "7",
-                    ]
-                )
+        with (
+            patch("elablink.Experiment", return_value=experiment) as create_experiment,
+            patch("elablink.Resource", return_value=sample) as create_resource,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = run_example("experiments_and_resources")
 
-        constructor.assert_called_once_with()
-        client.create_experiment.assert_called_once_with("Test")
-        client.create_resource.assert_called_once_with("Sample A", category=7)
-        self.assertEqual(result, (experiment, sample))
+        create_experiment.assert_called_once_with(title="First measurement")
+        create_resource.assert_called_once_with(title="Sample A", category=3)
+        self.assertIs(result["experiment"], experiment)
+        self.assertIs(result["sample"], sample)
         self.assertIn("Characterisation", experiment.main_text)
         experiment.set_extra_fields.assert_called_once_with({"Temperature (K)": 4.2})
         experiment.add_step.assert_called_once_with("Cool the sample")
@@ -67,33 +83,16 @@ class ExperimentResourceExampleTests(unittest.TestCase):
         experiment.link_resource.assert_called_once_with(21)
         sample.link_experiment.assert_called_once_with(11)
 
-    def test_missing_category_never_creates_a_client(self):
-        example = load_example("experiments_and_resources")
-        with patch.object(example, "Client") as client:
-            with contextlib.redirect_stderr(io.StringIO()):
-                with self.assertRaises(SystemExit):
-                    example.main([])
-        client.assert_not_called()
-
     def test_duplicate_experiment_title_does_not_create_an_unused_resource(self):
         from elablink import DuplicateTitle
 
-        example = load_example("experiments_and_resources")
-        client = Mock(spec=Client)
-        client.create_experiment.side_effect = DuplicateTitle("Test")
-        with patch.object(example, "Client", return_value=client):
+        with (
+            patch("elablink.Experiment", side_effect=DuplicateTitle("First measurement")),
+            patch("elablink.Resource") as create_resource,
+        ):
             with self.assertRaises(DuplicateTitle):
-                example.main(["--title", "Test", "--resource-category", "7"])
-        client.create_resource.assert_not_called()
-
-    def test_notebook_contains_no_saved_outputs(self):
-        notebook = json.loads(
-            (ROOT / "examples" / "labmate_notebook.ipynb").read_text(encoding="utf-8")
-        )
-        for cell in notebook["cells"]:
-            if cell["cell_type"] == "code":
-                self.assertEqual(cell["outputs"], [])
-                self.assertIsNone(cell["execution_count"])
+                run_example("experiments_and_resources")
+        create_resource.assert_not_called()
 
 
 try:
@@ -119,26 +118,24 @@ except ImportError:
     HAS_ACQUISITION, "Requires plotting dependencies, IPython and the Labmate hook"
 )
 class AcquisitionExampleTests(unittest.TestCase):
-    def test_import_does_not_create_a_manager(self):
-        with patch("elablink.AcquisitionAnalysisManager") as manager:
-            load_example("labmate_acquisition")
-        manager.assert_not_called()
-
     def run_script(self, directory, client):
-        example = load_example("labmate_acquisition")
         managers = []
 
-        def manager(*args, **kwargs):
+        def manager(data_directory, **kwargs):
+            self.assertEqual(data_directory, "data")
+            self.assertEqual(kwargs, {"shell": None, "use_magic": False})
             instance = AcquisitionAnalysisManager(
-                *args, client_factory=lambda: client, **kwargs
+                directory, client_factory=lambda: client, **kwargs
             )
             managers.append(instance)
             return instance
 
-        with patch.object(example, "AcquisitionAnalysisManager", side_effect=manager):
-            with contextlib.redirect_stdout(io.StringIO()):
-                result = example.main(["--data", str(directory)])
-        return example, managers[0], result
+        with (
+            patch("elablink.AcquisitionAnalysisManager", side_effect=manager),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            namespace = run_example("labmate_acquisition")
+        return namespace, managers[0], namespace["info"]
 
     def check_uploaded_signal(self, remote):
         h5 = next(
@@ -168,7 +165,7 @@ class AcquisitionExampleTests(unittest.TestCase):
             self.assertEqual(result["title"], "Sinusoid")
             remote = client.experiments["Sinusoid"]
             acquisition_source, analysis_source = self.check_uploaded_signal(remote)
-            source = Path(example.__file__).read_text(encoding="utf-8")
+            source = Path(example["__file__"]).read_text(encoding="utf-8")
             self.assertEqual(acquisition_source, source)
             self.assertEqual(analysis_source, source)
             self.assertTrue(all(job["state"] == "done" for job in manager.upload_status()))

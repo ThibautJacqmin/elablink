@@ -140,14 +140,16 @@ Runnable example
 ----------------
 
 ``examples/experiments_and_resources.py`` combines the basic operations above.
-From the project root, supply a resource category ID from your server:
+Set ``resource_category`` near the top of the file to a category ID from your
+server, then run it from the project root:
 
 .. code-block:: console
 
-   python examples/experiments_and_resources.py --resource-category 3
+   python examples/experiments_and_resources.py
 
-Read the example before running it: it creates real records. Choose a new
-``--title`` when running again if unique experiment titles are enabled.
+Read the example before running or importing it: it creates real records.
+Change the experiment title directly in the script when running again if
+unique experiment titles are enabled. There are no command-line arguments.
 
 .. literalinclude:: ../examples/experiments_and_resources.py
    :language: python

@@ -52,6 +52,12 @@ Labmate integration
 workflow and adds background checkpoints, experiment routing, upload-state
 inspection, waiting/closing and context-manager support.
 
+Acquisition and analysis code from notebook cells or scripts is stored with
+the data in HDF5; figures and matching sidecar files are also uploaded.
+Retrieve those attachments through the direct API and reopen local HDF5 files
+with Labmate. The manager does not download missing files automatically, and
+does not archive the complete notebook document.
+
 Its ``experiment`` property returns an ``AsyncExperiment`` with queued writes:
 
 .. code-block:: python
