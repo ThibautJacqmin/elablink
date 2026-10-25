@@ -23,7 +23,8 @@ experiment.link_resource(laser.ID)
 ```
 
 These calls modify your server immediately. First install the project and
-create your private `elablink.conf`: [installation](docs/installation.rst).
+configure your connection once in the project root:
+[installation](docs/installation.rst).
 The [experiment and resource guide](docs/experiments_and_resources.rst) explains
 loading existing records, editing properties and attaching files.
 
@@ -42,7 +43,8 @@ aqm = AcquisitionAnalysisManager("data")
 
 Use Labmate's usual acquisition and analysis calls, then `aqm.close()` to finish
 the uploads. After a save, `aqm.experiment.add_step("Measurement complete")`
-also queues a note without waiting for the network. See the
+also queues a note without waiting for the network. No configuration paths are
+needed in measurement code. See the
 [notebook guide](docs/notebooks.rst), [script guide](docs/scripts.rst) and
 [upload behaviour](docs/background_uploads.rst).
 

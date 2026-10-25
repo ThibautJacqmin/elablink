@@ -146,9 +146,8 @@ From the project root, supply a resource category ID from your server:
 
    python examples/experiments_and_resources.py --resource-category 3
 
-Use ``--config path/to/elablink.conf`` for another configuration file. Read the
-example before running it: it creates real records. Choose a new ``--title``
-when running again if unique experiment titles are enabled.
+Read the example before running it: it creates real records. Choose a new
+``--title`` when running again if unique experiment titles are enabled.
 
 .. literalinclude:: ../examples/experiments_and_resources.py
    :language: python

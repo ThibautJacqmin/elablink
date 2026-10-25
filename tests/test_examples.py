@@ -46,8 +46,6 @@ class ExperimentResourceExampleTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 result = example.main(
                     [
-                        "--config",
-                        "not-read.conf",
                         "--title",
                         "Test",
                         "--resource-category",
@@ -55,7 +53,7 @@ class ExperimentResourceExampleTests(unittest.TestCase):
                     ]
                 )
 
-        constructor.assert_called_once_with("not-read.conf")
+        constructor.assert_called_once_with()
         client.create_experiment.assert_called_once_with("Test")
         client.create_resource.assert_called_once_with("Sample A", category=7)
         self.assertEqual(result, (experiment, sample))
@@ -139,9 +137,7 @@ class AcquisitionExampleTests(unittest.TestCase):
 
         with patch.object(example, "AcquisitionAnalysisManager", side_effect=manager):
             with contextlib.redirect_stdout(io.StringIO()):
-                result = example.main(
-                    ["--config", "not-read.conf", "--data", str(directory)]
-                )
+                result = example.main(["--data", str(directory)])
         return example, managers[0], result
 
     def check_uploaded_signal(self, remote):

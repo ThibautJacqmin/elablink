@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from .async_experiment import AsyncExperiment
 from .bridge import Bridge
 from .client import Client
+from .config import resolve_config_path
 
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,8 @@ class AsyncBridge:
         title: Optional fixed eLabFTW experiment title. Otherwise use the acquisition
             name, or the data folder name for reopened analyses. Existing titles are
             reused when UNIQUE_EXPERIMENTS_TITLES is enabled in the configuration.
-        config_path: Client configuration file, relative to the current directory.
+        config_path: Optional explicit Client configuration file. Otherwise use
+            the root project's configuration setting, resolved before queueing.
         spool_directory: Local directory used for stable copies of files to upload.
         experiment_id: Existing experiment ID to use instead of resolving the title.
         request_timeout: Default HTTP connection and read timeouts, in seconds.
@@ -83,7 +85,7 @@ class AsyncBridge:
         self,
         title: Optional[str] = None,
         *,
-        config_path: Union[str, Path] = "elablink.conf",
+        config_path: Optional[Union[str, Path]] = None,
         spool_directory: Union[str, Path] = "data/.upload_queue",
         experiment_id: Optional[int] = None,
         request_timeout: Tuple[float, float] = (5, 30),
@@ -94,10 +96,14 @@ class AsyncBridge:
         if len(request_timeout) != 2 or any(value <= 0 for value in request_timeout):
             raise ValueError("HTTP connection and read timeouts must be positive")
         self.title = title
-        self.config_path = Path(config_path).expanduser().resolve()
+        if client_factory is None:
+            self.config_path = resolve_config_path(config_path)
+        else:
+            self.config_path = (
+                Path(config_path).expanduser().resolve()
+                if config_path is not None else None
+            )
         self.spool_directory = Path(spool_directory).expanduser().resolve()
-        if client_factory is None and not self.config_path.is_file():
-            raise FileNotFoundError(self.config_path)
         self.spool_directory.mkdir(parents=True, exist_ok=True)
         self.experiment_id = experiment_id
         self._request_timeout = request_timeout

@@ -20,15 +20,12 @@ from elablink import AcquisitionAnalysisManager
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default="elablink.conf")
     parser.add_argument("--data", default="data")
     args = parser.parse_args(argv)
 
     # In a script there are no notebook cells: save this file as the source code.
     source = Path(__file__).read_text(encoding="utf-8")
-    with AcquisitionAnalysisManager(
-        args.data, config_path=args.config, shell=None, use_magic=False
-    ) as aqm:
+    with AcquisitionAnalysisManager(args.data, shell=None, use_magic=False) as aqm:
         aqm.acquisition_cell("Sinusoid", cell=source)
         t = np.linspace(0, 1, 500)
         y = np.sin(2 * np.pi * 5 * t)

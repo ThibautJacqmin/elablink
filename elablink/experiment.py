@@ -31,7 +31,7 @@ class Experiment:
         *,
         title: str = None,
         category: str | int = None,
-        config_path: str = "elablink.conf",
+        config_path: str | Path | None = None,
     ):
         """Create a record, or open an existing record by ID.
 
@@ -41,7 +41,8 @@ class Experiment:
             title: Title for a new record; defaults to "Untitled experiment"
                 ("Untitled resource" for resources).
             category: Category for a new record; resource categories use numeric IDs.
-            config_path: Configuration file used when ``api`` is omitted.
+            config_path: Optional configuration override when ``api`` is omitted.
+                Otherwise use the root project's configuration setting.
 
         New records are created immediately on the server. Supplying both ``api``
         and ``ID`` binds a wrapper without fetching; this is also used by Client.

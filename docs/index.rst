@@ -1,11 +1,21 @@
 eLabLink
 ========
 
-Your eLabFTW notebook, from Python.
+Your eLabFTW notebook, from Python. eLabLink helps you to use programmatically the online scientific lab book
+directly in your python experimental sequences.
 
-eLabLink, written and maintained by **Thibaut Jacqmin**, provides Python objects
-for familiar parts of the eLabFTW interface. Create an experiment or a resource,
+First, eLabLink provides Python objects  that map the eLabFTW 
+interface. Create an experiment or a resource,
 then edit its notes, steps, tags, custom fields and attachments.
+
+Second, it optionnaly provides tools to save and retrieve acquisition and analysis
+ipynb cells, or scripts together with acquisition and analysis data,
+from eLabFTW experiments
+
+This is done by using the labmate Python module. Your data and acquisition, and analysis codes
+are then gather in a .h5 file and attached to your eLabFTW experiment asynchronously, without
+blocking your next acquisition cell. 
+
 
 .. code-block:: python
 
@@ -17,7 +27,7 @@ then edit its notes, steps, tags, custom fields and attachments.
    experiment.add_comment("The signal is stable.")
 
 These few lines create and edit a real server record. Prepare your private
-``elablink.conf`` first: :doc:`installation`.
+project setup first: :doc:`installation`.
 
 From the GUI to Python
 ----------------------

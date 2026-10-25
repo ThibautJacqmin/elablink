@@ -20,15 +20,14 @@ Labmate is not required to work directly with experiments and resources.
 
 After updating an existing checkout to eLabLink, run this editable installation
 again, use ``from elablink import ...`` in your code and restart the kernel.
-The default configuration filename is now ``elablink.conf``; rename your private
-configuration accordingly or pass its path explicitly. Public classes are
+The default configuration filename is now ``elablink.conf``. Public classes are
 ``Experiment``, ``Resource``, ``Client`` and ``AsyncExperiment``.
 
 Create your configuration
 -------------------------
 
-Copy ``elablink.conf.example`` to ``elablink.conf`` in the folder from which
-you run Python, and fill in your server address and API key:
+Copy ``elablink.conf.example`` to ``elablink.conf`` in the project root, next to
+``pyproject.toml``, and fill in your server address and API key:
 
 .. code-block:: ini
 
@@ -44,18 +43,23 @@ team cannot be resolved automatically.
 Keep this file private and out of Git. Leave ``VERIFY_SSL=true`` enabled;
 ask your administrator to resolve server certificate problems.
 
-For a different configuration path, make a client explicitly:
+The connection is configured once for the project. Its location is declared in
+the root ``pyproject.toml``:
 
-.. code-block:: python
+.. code-block:: toml
 
-   from elablink import Client
+   [tool.elablink]
+   config_path = "elablink.conf"
 
-   client = Client("path/to/my.conf")
-   experiment = client.create_experiment("Laser calibration")
+This path is relative to ``pyproject.toml``, not to the notebook or script.
+You may change it here to point to a private file elsewhere. The setting
+contains only a path; the API key stays in the private configuration file.
 
-The acquisition manager accepts ``config_path="path/to/my.conf"`` too.
-Relative paths start at Python's current working directory, not automatically
-at the script's location.
+When you run Python from the project or one of its subfolders, eLabLink finds
+this setting automatically. The same examples work from the root or from
+``examples/``: there is no configuration path to add to measurement code.
+For advanced use outside this project, ``Client(config_path="...")`` and the
+acquisition manager's ``config_path`` argument remain available.
 
 Add Labmate for acquisition
 ---------------------------
@@ -100,6 +104,16 @@ If installation fails, first update the packaging tools in this environment:
 
 Then repeat the editable install. ``import sys; print(sys.executable)`` shows
 which Python your notebook is using. A separate terminal may use another one.
+
+If Anaconda fails during build isolation with a ``certifi_win32`` startup error
+mentioning ``wrapt`` or ``truststore``, use the already installed build tools:
+
+.. code-block:: python
+
+   %pip install --no-build-isolation --use-pep517 -e "."
+
+Use your checkout path instead of ``"."`` if needed. This keeps editable mode
+and does not disable certificate verification.
 
 Experiment titles
 -----------------

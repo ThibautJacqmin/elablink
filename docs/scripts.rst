@@ -11,11 +11,11 @@ After :doc:`installation`, run it from the project root:
 
    python examples/labmate_acquisition.py
 
-To choose another configuration or data directory:
+To choose another local data directory:
 
 .. code-block:: console
 
-   python examples/labmate_acquisition.py --config path/to/elablink.conf --data measurements
+   python examples/labmate_acquisition.py --data measurements
 
 The example modifies your real server only when run. Importing it does not
 start an acquisition.
@@ -67,8 +67,7 @@ record through a separate client using the returned ID:
    experiment = Client().load_experiment(ID=information["id"])
    print(experiment.steps)
 
-This last read waits for the server, like the direct API examples. Use the same
-configuration path if you selected a nondefault one.
+This last read waits for the server, like the direct API examples.
 
 Timing and repeated acquisitions
 --------------------------------

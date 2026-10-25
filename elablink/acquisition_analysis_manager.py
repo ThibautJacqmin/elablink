@@ -44,7 +44,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         *,
         experiment_title: Optional[str] = None,
         experiment_id: Optional[int] = None,
-        config_path: Union[str, Path] = "elablink.conf",
+        config_path: Optional[Union[str, Path]] = None,
         spool_directory: Optional[Union[str, Path]] = None,
         request_timeout: Tuple[float, float] = (5, 30),
         client_factory: Optional[Callable[[], Any]] = None,

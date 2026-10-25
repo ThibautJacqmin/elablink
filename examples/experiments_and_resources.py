@@ -4,7 +4,7 @@ Run from the project folder, for example:
     python examples/experiments_and_resources.py --resource-category 7
 
 Replace 7 with a resource category ID from your own eLabFTW installation.
-This example writes to the server configured in elablink.conf.
+This example creates real records on your eLabFTW server.
 Choose a new --title when running again if unique experiment titles are enabled.
 
 Author: Thibaut Jacqmin
@@ -18,7 +18,6 @@ from elablink import Client
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default="elablink.conf")
     parser.add_argument("--title", default="First measurement")
     parser.add_argument(
         "--resource-category",
@@ -28,7 +27,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    client = Client(args.config)
+    client = Client()
 
     # An experiment is the notebook entry for one piece of work.
     experiment = client.create_experiment(args.title)

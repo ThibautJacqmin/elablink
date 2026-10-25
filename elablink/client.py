@@ -11,6 +11,8 @@ and templates.
 import elabapi_python as ep
 from functools import wraps
 from inspect import signature
+from pathlib import Path
+from .config import resolve_config_path
 from .experiment import Experiment
 from .resource import Resource
 from .exceptions import (
@@ -29,15 +31,16 @@ class Client:
     the API objects required to manage experiments and related entities.
     """
 
-    def __init__(self, config_path: str = "elablink.conf"):
+    def __init__(self, config_path: str | Path | None = None):
         """Initialize the client and underlying API objects.
 
         Args:
-            config_path: Path to the `elablink.conf` configuration file.
+            config_path: Optional explicit configuration file. By default use
+                the root project's ``[tool.elablink].config_path`` setting.
         """
-        self.config_path = config_path
+        self.config_path = resolve_config_path(config_path)
         # Read and parse configuration file
-        self.config = self._read_configuration_file(config_path)
+        self.config = self._read_configuration_file(self.config_path)
 
         # API configuration
         self._api_configuration()

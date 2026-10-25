@@ -24,6 +24,7 @@ setup(
     install_requires=[
         "elabapi-python",
         "urllib3",
+        "tomli; python_version < '3.11'",
     ],
     extras_require={
         "labmate": ["labmate", "matplotlib"],

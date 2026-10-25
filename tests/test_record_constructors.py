@@ -24,7 +24,7 @@ class RecordConstructorTests(unittest.TestCase):
             with self.subTest(entity=entity_class.__name__):
                 with patch("elablink.client.Client", return_value=self.client) as factory:
                     entity = entity_class()
-                factory.assert_called_once_with("elablink.conf")
+                factory.assert_called_once_with(None)
                 getattr(self.client, method).assert_called_once_with(title=title, category=None)
                 self.assertIs(entity.api, self.client)
                 self.assertEqual(entity.ID, 17)

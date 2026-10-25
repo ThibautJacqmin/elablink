@@ -25,9 +25,8 @@ server when run.
 
    aqm = AcquisitionAnalysisManager("data")
 
-Use eLabLink's manager instead of importing Labmate's manager. No extra hook
-or bridge setup is needed. Put ``elablink.conf`` in the notebook's working
-directory, or pass its location as ``config_path=...``.
+Use eLabLink's manager instead of importing Labmate's manager. No extra hook,
+bridge or configuration setup is needed in the notebook.
 
 2. Acquire a sinusoid
 ---------------------
