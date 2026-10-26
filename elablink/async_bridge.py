@@ -19,6 +19,13 @@ from .async_experiment import AsyncExperiment
 from .bridge import Bridge
 from .client import Client
 from .config import resolve_config_path
+from .remote_analysis import (
+    RemoteSource,
+    download_analysis,
+    read_source,
+    remember_source,
+    validate_request,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +37,9 @@ class _Snapshot:
 
     filepath: str
     experiment_name: str
+    experiment_id: Optional[int] = None
+    server: Optional[str] = None
+    original_filepath: Optional[str] = None
 
 
 @dataclass
@@ -71,6 +81,8 @@ class AsyncBridge:
         request_timeout: Default HTTP connection and read timeouts, in seconds.
         client_factory: Optional factory for a compatible client, called on the worker.
             Custom factories are responsible for their own transport timeouts.
+        analysis_directory: Local origin index and downloaded-file directory.
+            Defaults to ``.elabftw`` beside the upload queue.
 
     Attach to a manager or its LifecycleHooks. Local saves briefly copy files into
     the spool; network operations run in order on one worker. Submit and flush from
@@ -90,6 +102,7 @@ class AsyncBridge:
         experiment_id: Optional[int] = None,
         request_timeout: Tuple[float, float] = (5, 30),
         client_factory: Optional[Callable[[], Any]] = None,
+        analysis_directory: Optional[Union[str, Path]] = None,
     ) -> None:
         if title is not None and not title.strip():
             raise ValueError("An experiment title is required")
@@ -101,9 +114,15 @@ class AsyncBridge:
         else:
             self.config_path = (
                 Path(config_path).expanduser().resolve()
-                if config_path is not None else None
+                if config_path is not None
+                else None
             )
         self.spool_directory = Path(spool_directory).expanduser().resolve()
+        self._analysis_directory = (
+            Path(analysis_directory).expanduser().resolve()
+            if analysis_directory is not None
+            else self.spool_directory.parent / ".elabftw"
+        )
         self.spool_directory.mkdir(parents=True, exist_ok=True)
         self.experiment_id = experiment_id
         self._request_timeout = request_timeout
@@ -112,6 +131,8 @@ class AsyncBridge:
         self._bridge = None
         self._experiments: Dict[Union[str, int], Any] = {}
         self._experiment_handles: Dict[Union[str, int], AsyncExperiment] = {}
+        self._analysis_sources: Dict[str, RemoteSource] = {}
+        self._analysis_handles: Dict[str, AsyncExperiment] = {}
         self._latest_experiment: Optional[AsyncExperiment] = None
         self._worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="elabftw")
         self._owner = threading.get_ident()
@@ -151,6 +172,9 @@ class AsyncBridge:
         self.enqueue(analysis, label="analysis + figure")
 
     def _title_for(self, data: Any) -> str:
+        source = self._analysis_sources.get(self._prefix(data.filepath))
+        if source is not None:
+            return source.title
         title = (
             self.title
             or getattr(data, "experiment_name", None)
@@ -163,6 +187,64 @@ class AsyncBridge:
     def _experiment_key(self, title: str) -> Union[str, int]:
         return self.experiment_id if self.experiment_id is not None else title
 
+    @staticmethod
+    def _prefix(filepath: Union[str, Path]) -> str:
+        path = str(Path(filepath).expanduser().resolve())
+        return path[:-3] if path.endswith(".h5") else path
+
+    def download_analysis(
+        self, experiment_id: int, filename: str, directory: Union[str, Path]
+    ) -> Future:
+        """Queue reuse or download of one remote HDF5 attachment's local copy."""
+        self._check_open()
+        validate_request(experiment_id, filename)
+        if self.experiment_id is not None and self.experiment_id != experiment_id:
+            raise ValueError(
+                "The requested experiment conflicts with the manager's experiment_id"
+            )
+        directory = Path(directory).expanduser().resolve()
+        future = self._worker.submit(
+            self._download_analysis, experiment_id, filename, directory
+        )
+        self._jobs.append(_Job("download analysis", future))
+        return future
+
+    def _download_analysis(self, experiment_id: int, filename: str, directory: Path):
+        self._ensure_client()
+        filepath, source, experiment = download_analysis(
+            self._client, experiment_id, filename, directory
+        )
+        self._experiments[experiment_id] = experiment
+        result = self._experiment_info(experiment, source.title)
+        result["filepath"] = str(filepath)
+        return result
+
+    def bind_analysis(
+        self, filepath: Union[str, Path], prerequisite: Optional[Future] = None
+    ):
+        """Remember an attachment's origin without accessing the server."""
+        self._check_open()
+        source = read_source(Path(filepath), self._analysis_directory)
+        if source is None:
+            return
+        if (
+            self.experiment_id is not None
+            and self.experiment_id != source.experiment_id
+        ):
+            raise ValueError("The local file belongs to another experiment_id")
+        prefix = self._prefix(filepath)
+        self._analysis_sources[prefix] = source
+        if prerequisite is not None:
+            handle = AsyncExperiment(
+                self, source.experiment_id, source.title, prerequisite
+            )
+            self._analysis_handles[prefix] = handle
+            self._latest_experiment = handle
+
+    def _prepare_analysis(self, snapshot: _Snapshot):
+        experiment = self._ensure_remote(snapshot)
+        return self._experiment_info(experiment, snapshot.experiment_name)
+
     @property
     def experiment(self) -> AsyncExperiment:
         """Return a bound editing handle for the most recently submitted checkpoint."""
@@ -174,6 +256,19 @@ class AsyncBridge:
     def experiment_for(self, data: Any) -> AsyncExperiment:
         """Return a bound editing handle for this acquisition or analysis context."""
         self._check_open()
+        prefix = self._prefix(data.filepath)
+        source = self._analysis_sources.get(prefix)
+        if source is not None:
+            if prefix not in self._analysis_handles:
+                snapshot = _Snapshot(
+                    prefix, source.title, source.experiment_id, source.server
+                )
+                future = self._worker.submit(self._prepare_analysis, snapshot)
+                self._jobs.append(_Job("open analysis experiment", future))
+                self._analysis_handles[prefix] = AsyncExperiment(
+                    self, source.experiment_id, source.title, future
+                )
+            return self._analysis_handles[prefix]
         key = self._experiment_key(self._title_for(data))
         if key not in self._experiment_handles:
             raise RuntimeError(
@@ -191,6 +286,7 @@ class AsyncBridge:
         if not h5_path.is_file():
             raise FileNotFoundError(h5_path)
         title = self._title_for(data)
+        remote_source = self._analysis_sources.get(str(prefix))
         directory = Path(mkdtemp(prefix="snapshot-", dir=self.spool_directory))
         try:
             files = [path for path in prefix.parent.iterdir() if path.is_file()]
@@ -208,7 +304,13 @@ class AsyncBridge:
                     target = directory / source.name
                     shutil.copy2(source, target)
                     attachments.append(target)
-            snapshot = _Snapshot(str(directory / prefix.name), title)
+            snapshot = _Snapshot(
+                str(directory / prefix.name),
+                title,
+                remote_source.experiment_id if remote_source else None,
+                remote_source.server if remote_source else None,
+                str(prefix) + ".h5",
+            )
             future = self._worker.submit(
                 self._upload, snapshot, tuple(attachments), directory
             )
@@ -216,14 +318,20 @@ class AsyncBridge:
             self._remove_snapshot(directory)
             raise
         self.latest_snapshot = future
-        key = self._experiment_key(title)
+        key = (
+            remote_source.experiment_id
+            if remote_source
+            else self._experiment_key(title)
+        )
         handle = AsyncExperiment(self, key, title, future)
         self._experiment_handles[key] = handle
+        if remote_source is not None:
+            self._analysis_handles[str(prefix)] = handle
         self._latest_experiment = handle
         self._jobs.append(_Job(label, future))
         return future
 
-    def _ensure_remote(self, snapshot: _Snapshot) -> Any:
+    def _ensure_client(self) -> None:
         if self._client is None:
             if self._client_factory is None:
                 self._client = Client(str(self.config_path))
@@ -232,10 +340,24 @@ class AsyncBridge:
                 self._client = self._client_factory()
         if self._bridge is None:
             self._bridge = Bridge(self._client)
-        key = self._experiment_key(snapshot.experiment_name)
+
+    def _ensure_remote(self, snapshot: _Snapshot) -> Any:
+        self._ensure_client()
+        if snapshot.server is not None:
+            server = self._client.configuration.host.rstrip("/")
+            if server != snapshot.server:
+                raise ValueError(
+                    "The downloaded file belongs to a different eLabFTW server"
+                )
+        experiment_id = (
+            snapshot.experiment_id
+            if snapshot.experiment_id is not None
+            else self.experiment_id
+        )
+        key = experiment_id if experiment_id is not None else snapshot.experiment_name
         if key not in self._experiments:
-            if self.experiment_id is not None:
-                experiment = self._client.load_experiment(ID=self.experiment_id)
+            if experiment_id is not None:
+                experiment = self._client.load_experiment(ID=experiment_id)
             else:
                 experiment = self._bridge.save_experiment(snapshot)
             self._experiments[key] = experiment
@@ -249,6 +371,16 @@ class AsyncBridge:
             snapshot, attachments=attachments, experiment=experiment
         )
         result = self._experiment_info(experiment, snapshot.experiment_name)
+        if snapshot.original_filepath is not None:
+            remember_source(
+                Path(snapshot.original_filepath),
+                RemoteSource(
+                    experiment.ID,
+                    snapshot.experiment_name,
+                    self._client.configuration.host.rstrip("/"),
+                ),
+                self._analysis_directory,
+            )
         self._remove_snapshot(directory)
         return result
 

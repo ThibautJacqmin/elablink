@@ -14,10 +14,13 @@ from notebook cells or scripts together with measurement data in a HDF5
 experiment asynchronously, without waiting for the network before your next
 acquisition cell. Local saves and snapshot copies still take time.
 
-You can later download the saved files from the experiment and reopen the HDF5
-data with Labmate. Downloads use the direct API; the acquisition manager does
-not retrieve missing files automatically. Notebook cell source is stored, not
-the complete ``.ipynb`` document.
+You can later reopen an attached HDF5 file with
+``aqm.analysis_cell(experiment_id=123, filename="run.h5")``. eLabLink reuses its
+associated local copy, or downloads the file when that copy is missing. Existing
+local changes are preserved rather than replaced by the server version. Saved
+analysis checkpoints go back to the same experiment. A required download must
+finish before analysis; uploads remain asynchronous. Notebook cell source is
+stored, not the complete ``.ipynb`` document.
 
 .. code-block:: python
 
@@ -73,7 +76,8 @@ not hold up your next acquisition cell. Only the manager import changes:
    aqm = AcquisitionAnalysisManager("data")
 
 Follow :doc:`notebooks` for Jupyter and VS Code, or :doc:`scripts` for a normal
-Python script. Finish with ``aqm.close()`` to wait for uploads and report errors.
+Python script. Finish with ``aqm.close()`` to wait for pending uploads and report
+errors; closing does not save unsaved analysis changes.
 Local file writes and snapshot copies still take time; the network work is
 asynchronous. See :doc:`background_uploads` for what happens if a transfer fails.
 

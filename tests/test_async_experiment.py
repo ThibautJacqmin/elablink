@@ -339,7 +339,7 @@ class ManagerExperimentTests(ExperimentTestCase):
         with self.assertRaisesRegex(RuntimeError, "[Ss]ave"):
             _ = manager.experiment
 
-    def test_fresh_old_analysis_requires_its_own_saved_checkpoint(self):
+    def test_indexed_old_analysis_keeps_its_successful_upload_association(self):
         client = EditableClient()
         original = self.manager(client)
         self.acquire(original, "A")
@@ -348,13 +348,28 @@ class ManagerExperimentTests(ExperimentTestCase):
         reopened = self.manager(client)
         self.acquire(reopened, "B")
         reopened.analysis_cell(filepath=filepath, cell="old analysis")
-        with self.assertRaisesRegex(RuntimeError, "[Ss]ave"):
-            _ = reopened.experiment
+        reopened.experiment.add_comment("Known original upload")
         reopened.save_fig(fig=FileFigure(), name="fit.png", cell="fit code")
         reopened.experiment.add_step("A figure was saved")
         reopened.flush(timeout=5)
         self.assertEqual(client.experiments["A"].steps, ["A figure was saved"])
+        self.assertEqual(client.experiments["A"].comments, ["Known original upload"])
         self.assertEqual(client.experiments["B"].steps, [])
+
+    def test_unindexed_local_analysis_still_requires_a_saved_checkpoint(self):
+        client = EditableClient()
+        manager = self.manager(client)
+        self.acquire(manager, "A")
+        original = Path(str(manager.current_filepath) + ".h5")
+        copied = self.root / "Unassociated" / "run.h5"
+        copied.parent.mkdir()
+        copied.write_bytes(original.read_bytes())
+        manager.close(timeout=5)
+        reopened = self.manager(client)
+        self.acquire(reopened, "B")
+        reopened.analysis_cell(filepath=copied, cell="local analysis")
+        with self.assertRaisesRegex(RuntimeError, "[Ss]ave"):
+            _ = reopened.experiment
 
     def test_fixed_title_keeps_both_acquisition_handles_on_the_selected_experiment(
         self,

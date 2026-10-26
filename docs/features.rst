@@ -54,9 +54,14 @@ inspection, waiting/closing and context-manager support.
 
 Acquisition and analysis code from notebook cells or scripts is stored with
 the data in HDF5; figures and matching sidecar files are also uploaded.
-Retrieve those attachments through the direct API and reopen local HDF5 files
-with Labmate. The manager does not download missing files automatically, and
-does not archive the complete notebook document.
+Open local HDF5 files with ``analysis_cell(filepath=...)``, or select one through
+eLabFTW with ``analysis_cell(experiment_id=123, filename="run.h5")``. The manager
+reuses the associated local file when available and downloads it otherwise.
+It preserves local changes, without automatically refreshing from the server,
+and retains the original experiment as the destination for saved checkpoints.
+Associations are specific to the configured server. A required download waits
+before analysis; uploads remain asynchronous. Stored code is not executed
+automatically, and the complete notebook document is not archived.
 
 Its ``experiment`` property returns an ``AsyncExperiment`` with queued writes:
 

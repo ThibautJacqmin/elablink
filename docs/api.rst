@@ -40,13 +40,14 @@ available; consult the `Labmate documentation
 <https://kyrylo-gr.github.io/labmate/>`_ for their full reference.
 
 .. autoclass:: elablink.acquisition_analysis_manager.AcquisitionAnalysisManager
-   :members: experiment, upload_status, flush, close
+   :members: analysis_cell, experiment, upload_status, flush, close
 
 Queued experiment edits
 -----------------------
 
 The manager supplies this write-only handle after saving an acquisition or a
-figure. It does not expose a synchronous experiment object to the notebook.
+figure, or after opening a remote file for analysis. It does not expose a
+synchronous experiment object to the notebook.
 
 .. autoclass:: elablink.async_experiment.AsyncExperiment
    :members:

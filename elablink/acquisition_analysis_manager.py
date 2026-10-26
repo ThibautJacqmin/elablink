@@ -14,6 +14,7 @@ from labmate.acquisition_notebook import (
 
 from .async_bridge import AsyncBridge
 from .async_experiment import AsyncExperiment
+from .remote_analysis import validate_request
 
 
 class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
@@ -24,9 +25,11 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         from elablink import AcquisitionAnalysisManager
         aqm = AcquisitionAnalysisManager("data")
 
-    The name passed to ``acquisition_cell`` selects the remote experiment. Reopened
-    analyses use their data folder name. ``experiment_title`` overrides that routing;
-    ``experiment_id`` sends everything to one existing experiment. Title reuse follows
+    The name passed to ``acquisition_cell`` selects the remote experiment. Known
+    uploaded/downloaded files keep their original experiment ID when reopened.
+    Otherwise analyses follow the acquisition/folder name. ``experiment_title``
+    overrides name-based routing; ``experiment_id`` fixes one existing experiment
+    and rejects remote opens for another ID. Title reuse follows
     ``UNIQUE_EXPERIMENTS_TITLES`` in ``elablink.conf``.
 
     Standard Labmate keyword arguments are forwarded unchanged. Additional options
@@ -60,6 +63,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
             experiment_id=experiment_id,
             request_timeout=request_timeout,
             client_factory=client_factory,
+            analysis_directory=Path(str(self.data_directory)) / ".elabftw",
         )
         try:
             self._elab_bridge.attach(self)
@@ -72,8 +76,8 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         """Access queued edits for the current acquisition or analysis's experiment.
 
         The handle does not wait for the server, and stays bound to its experiment
-        when another acquisition is selected. This manager must have saved at least
-        one acquisition or figure for that experiment first.
+        when another acquisition is selected. Save a checkpoint first, or reopen
+        a remote/previously uploaded file whose experiment association is known.
         """
         self._elab_bridge._check_open()
         data = self.current_analysis
@@ -82,6 +86,65 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         if data is None:
             raise RuntimeError("Save an acquisition before accessing aqm.experiment")
         return self._elab_bridge.experiment_for(data)
+
+    def analysis_cell(
+        self,
+        filename=None,
+        *,
+        acquisition_name=None,
+        cell=None,
+        filepath=None,
+        prerun=None,
+        experiment_id: Optional[int] = None,
+        download_timeout: Optional[float] = 120,
+    ):
+        """Analyse local data or explicitly download an eLabFTW HDF5 attachment.
+
+        Use ``filepath=...`` for an existing local file, as with Labmate. Use
+        ``experiment_id=123, filename="run.h5"`` to open an eLabFTW attachment.
+        An associated local file is reused; missing files are downloaded.
+        The remote form waits for the download before opening the data; figure
+        saves and experiment edits still upload asynchronously to its original ID.
+        Existing local copies are never overwritten. A local index (and a sidecar
+        for downloads) preserves the experiment when reopening its local path.
+
+        ``download_timeout`` limits the wait, not the HTTP request lifetime. A
+        timeout leaves the download running without changing the current analysis.
+        Check ``upload_status()`` and ``flush()`` for its eventual result/path.
+        """
+        if experiment_id is not None:
+            if filepath is not None:
+                raise ValueError("Use either filepath or experiment_id with filename")
+            validate_request(experiment_id, filename)
+            if download_timeout is not None and download_timeout <= 0:
+                raise ValueError("download_timeout must be positive or None")
+            future = self._elab_bridge.download_analysis(
+                experiment_id, filename, Path(str(self.data_directory)) / ".elabftw"
+            )
+            try:
+                information = future.result(timeout=download_timeout)
+            except TimeoutError:
+                if not future.done():
+                    raise TimeoutError(
+                        "The analysis download is still running; check upload_status() "
+                        "or flush() before reopening its local file"
+                    ) from None
+                raise
+            filepath = information["filepath"]
+            filename = None
+            self._elab_bridge.bind_analysis(filepath, future)
+        elif filepath is not None or filename is not None:
+            local_path = (
+                filepath if filepath is not None else self._get_full_filename(filename)
+            )
+            self._elab_bridge.bind_analysis(local_path)
+        return super().analysis_cell(
+            filename,
+            acquisition_name=acquisition_name,
+            cell=cell,
+            filepath=filepath,
+            prerun=prerun,
+        )
 
     def upload_status(self) -> List[Dict[str, Any]]:
         """Inspect file uploads and experiment edits without contacting the server."""

@@ -20,6 +20,32 @@ while their snapshot is being captured.
 The integration uses the current Labmate lifecycle hooks for acquisition saves
 and analysis-figure saves. No alternative Labmate storage backend is required.
 
+Opening remote data for analysis
+--------------------------------
+
+``aqm.analysis_cell(experiment_id=123, filename="run.h5")`` first checks the
+local association for that server, experiment ID and filename. It reuses the
+known local HDF5 file if present. A successful acquisition upload records its
+original local path, so a later analysis can reuse that file too. Files saved
+before this association existed are not found by guessing their folder names.
+
+If no associated local file is available, the worker downloads the HDF5 file
+to a local working folder. Data must arrive before Labmate can open it, so the
+call waits. Earlier queued jobs run first. Pass ``download_timeout=300`` to wait
+longer than the default 120 seconds; HTTP request timeouts also apply.
+
+The existing local copy takes precedence over the server version. Local changes
+are preserved, and there is no automatic remote refresh or conflict resolution.
+The local association is server-specific, requires no remote custom field,
+and remains available when you reopen the file in another manager.
+Keep one Python process responsible for a data directory: the local index is
+not a multi-process database.
+
+This operation does not run stored code or retrieve all attachments. Normal
+``filepath=...`` calls still use local files, without remote guesses.
+When you save a figure for the selected run, the updated HDF5 file and figure
+are saved locally first and uploaded asynchronously to the original experiment.
+
 What gets uploaded?
 -------------------
 
@@ -33,8 +59,9 @@ Local data remains the primary copy, and eLabFTW synchronisation is not a
 replacement for your laboratory's backups.
 
 ``aqm.experiment`` edits use the same worker. Each handle is tied to a saved
-checkpoint and one experiment. If that checkpoint fails, dependent edits fail
-instead of silently being applied elsewhere.
+checkpoint or successful remote analysis open, and to one experiment. If the
+prerequisite operation fails, dependent edits fail instead of silently being
+applied elsewhere.
 
 Check, wait and finish
 ----------------------
@@ -47,7 +74,9 @@ Check, wait and finish
 
 ``flush()`` waits for jobs submitted before the call. It returns the last
 submitted job's experiment ID, title and URL, or an empty dictionary if no jobs
-exist. Leaving a manager's ``with`` block also closes it.
+exist. Leaving a manager's ``with`` block also closes it. Closing only waits:
+it does not create a new save. For a remote reanalysis, ``save_fig()`` is what
+queues the updated analysis checkpoint and figure.
 
 Both wait calls default to 120 seconds; choose a longer timeout if needed:
 
@@ -94,7 +123,8 @@ Other boundaries
 
 * The asynchronous handle supports a small set of experiment edits, not
   resource edits or fresh server reads.
-* Missing local HDF5 files are not downloaded automatically before analysis.
+* Remote analysis requires an explicit experiment ID and HDF5 attachment filename;
+  a missing local ``filepath`` is not silently replaced by a download.
 * Attachment replacement is best-effort. If listing existing attachments fails,
   the uploader can fall back to creating another file. Reliable skipping of
   unchanged contents needs a compatible server-side hash, not just equal sizes.

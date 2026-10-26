@@ -35,8 +35,8 @@ analysis and keeps the saved data and code together. eLabLink adds a second
 copy in eLabFTW: local saves happen first, then network uploads run in the
 background, so a slow server does not hold up the next acquisition cell.
 Labmate stores the acquisition/analysis cell code or script source with the
-data in HDF5. Saved files can later be downloaded through the direct API and
-reopened with Labmate; automatic retrieval by the manager is not provided.
+data in HDF5. Measurements stored on eLabFTW can later be downloaded and reopened
+for analysis, without changing Labmate.
 
 ```python
 from elablink import AcquisitionAnalysisManager
@@ -44,8 +44,22 @@ from elablink import AcquisitionAnalysisManager
 aqm = AcquisitionAnalysisManager("data")
 ```
 
-Use Labmate's usual acquisition and analysis calls, then `aqm.close()` to finish
-the uploads. After a save, `aqm.experiment.add_step("Measurement complete")`
+Use Labmate's usual acquisition and analysis calls. To reanalyse a measurement
+from eLabFTW instead, select its experiment ID and exact HDF5 attachment filename:
+
+```python
+aqm.analysis_cell(experiment_id=123, filename="run.h5")
+```
+
+eLabLink reuses the local file already associated with that server, experiment
+and attachment, or downloads it if no associated file exists. Local changes take
+precedence: an existing working copy is not overwritten by a newer server copy.
+When a download is needed, it must finish before analysis. Subsequent
+`save_fig()` calls queue the updated HDF5 file and figure for that same experiment.
+
+Use `aqm.close()` to finish
+pending uploads; closing does not save unsaved analysis changes. After a save or
+a remote analysis open, `aqm.experiment.add_step("Measurement complete")`
 also queues a note without waiting for the network. No configuration paths are
 needed in measurement code. See the
 [notebook guide](docs/notebooks.rst), [script guide](docs/scripts.rst) and

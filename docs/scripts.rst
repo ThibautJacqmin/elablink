@@ -65,6 +65,30 @@ record through a separate client using the returned ID:
 
 This last read waits for the server, like the direct API examples.
 
+Reanalyse data from eLabFTW
+---------------------------
+
+In a later script, keep the imports and ``source`` assignment above, then select
+the experiment ID and exact HDF5 attachment filename instead of acquiring again:
+
+.. code-block:: python
+
+   with AcquisitionAnalysisManager("data", shell=None, use_magic=False) as aqm:
+       aqm.analysis_cell(experiment_id=123, filename="run.h5", cell=source)
+       figure, axes = plt.subplots()
+       axes.plot(aqm.data.t, aqm.data.y)
+       aqm.save_fig(fig=figure, name="reanalysis.png", cell=source)
+       plt.close(figure)
+       aqm.experiment.add_comment("Reanalysed the saved measurement.")
+
+The call reuses the local HDF5 file associated with that server, experiment ID
+and filename. If none is available, it waits for a download before opening it.
+Existing local changes take precedence; there is no automatic refresh from the
+server. Stored code is not executed. Saving the figure queues the updated HDF5
+file and figure for the original experiment, not a new experiment named after a
+folder. The context manager waits for those uploads before exiting. Closing alone
+does not save unsaved analysis changes.
+
 Timing and repeated acquisitions
 --------------------------------
 

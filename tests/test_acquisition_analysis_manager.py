@@ -245,7 +245,7 @@ class AcquisitionAnalysisManagerTests(unittest.TestCase):
             )
         )
 
-    def test_fresh_manager_resolves_existing_title_for_old_data(self):
+    def test_fresh_manager_uses_recorded_experiment_id_for_old_data(self):
         client = MultiExperimentClient()
         original = self.manager(client)
         self.acquire(original, name="calibration")
@@ -260,7 +260,7 @@ class AcquisitionAnalysisManagerTests(unittest.TestCase):
 
         self.assertEqual(result["id"], experiment.ID)
         self.assertEqual(len(client.experiments), 1)
-        self.assertIn((None, "calibration"), client.load_requests)
+        self.assertIn((experiment.ID, None), client.load_requests)
         self.assertTrue(
             any(name.endswith("_FIG_reopened.png") for name in experiment.files)
         )

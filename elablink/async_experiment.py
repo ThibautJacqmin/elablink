@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 class AsyncExperiment:
     """Queue experiment edits without waiting for the eLabFTW server.
 
-    Obtain a handle from ``aqm.experiment`` after saving an acquisition or figure.
+    Obtain a handle from ``aqm.experiment`` after saving a checkpoint or opening
+    an analysis whose remote experiment association is known.
     It stays bound to that experiment even when another acquisition is selected.
     Methods return Futures; errors are also reported by ``aqm.flush()`` and
     ``aqm.close()``. Text assignment is queued too, not confirmed immediately.
@@ -47,7 +48,7 @@ class AsyncExperiment:
         )
 
     def add_step(self, text: str) -> Future:
-        """Queue an experiment step after this handle's saved checkpoint uploads."""
+        """Queue a step after this handle's acquisition or analysis is ready."""
         return self._submit(
             lambda experiment: experiment.add_step(text), "experiment step"
         )
