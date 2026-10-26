@@ -1,85 +1,34 @@
 eLabLink
 ========
 
-Your eLabFTW notebook, from Python. eLabLink lets you use your online scientific
-lab notebook directly in your Python experimental sequences.
-
-First, eLabLink provides Python objects that map familiar parts of the eLabFTW
-interface. Create an experiment or a resource,
-then edit its notes, steps, tags, custom fields and attachments.
-
-Second, its optional Labmate integration saves acquisition and analysis code
-from notebook cells or scripts together with measurement data in a HDF5
-(``.h5``) file. eLabLink attaches the saved files and figures to your eLabFTW
-experiment asynchronously, without waiting for the network before your next
-acquisition cell. Local saves and snapshot copies still take time.
-
-You can later reopen an attached HDF5 file with
-``aqm.analysis_cell(experiment_id=123, filename="run.h5")``. eLabLink reuses its
-associated local copy, or downloads the file when that copy is missing. Existing
-local changes are preserved rather than replaced by the server version. Saved
-analysis checkpoints go back to the same experiment. A required download must
-finish before analysis; uploads remain asynchronous. Notebook cell source is
-stored, not the complete ``.ipynb`` document.
-
+eLabLink provides an intuitive, object-oriented Python interface to eLabFTW. 
+Experiments, resources, and their familiar GUI features are represented by 
+Python objects, properties, and methods, allowing you to interact with your 
+electronic lab notebook directly from Python.eLabLink lets you use your online 
+scientific lab notebook directly in your Python experimental sequences.
+You can easily create an experiment or a resource, then edit its title, main text,
+steps, tags, custom fields, and attachments.
 .. code-block:: python
-
-   from elablink import Experiment
-
    experiment = Experiment(title="Laser calibration")
    experiment.main_text = "<p>Measure the laser power.</p>"
    experiment.add_step("Align the beam")
    experiment.add_comment("The signal is stable.")
 
-These few lines create and edit a real server record. Prepare your private
-project setup first: :doc:`installation`.
 
-From the GUI to Python
-----------------------
 
-.. list-table::
-   :header-rows: 1
-   :widths: 35 65
 
-   * - In eLabFTW
-     - In eLabLink
-   * - An experiment
-     - ``Experiment(...)``
-   * - A resource, such as a sample or instrument
-     - ``Resource(...)``
-   * - Title and main text
-     - ``record.title`` and ``record.main_text``
-   * - Add a step, comment or tag
-     - ``record.add_step(...)``, ``add_comment(...)``, ``add_tag(...)``
-   * - Custom fields, attached files and related records
-     - ``set_extra_fields(...)``, ``upload_file(...)``, ``link_resource(...)``
+Labmate integration
+========
 
-The names follow the eLabFTW concepts. Not every GUI operation is implemented;
-see :doc:`features` for the precise scope. Start with
-:doc:`experiments_and_resources` for short examples.
+eLabLink also integrates with `Labmate <https://kyrylo-gr.github.io/labmate/>`, a Python framework for saving and analyzing experimental data.
 
-Also synchronise acquisition data
----------------------------------
+Labmate saves measurement data together with the Python code used for acquisition and analysis in HDF5 (.h5) files. This allows you to reopen previous measurements and continue analyzing them without relying on variables still present in memory. It also comes with a very useful h5 file viewer `h5viewer <https://github.com/kyrylo-gr/h5viewer>` that enables fast visualisation of h5 file content, and quickly rerun an old experimental sequence.
 
-`Labmate <https://kyrylo-gr.github.io/labmate/>`_ separates **acquisition** from
-**analysis** and keeps the saved data and code together. Its analysis workflow
-reads the saved data instead of relying on variables left in notebook memory.
+Labmate saves your measurement/analysis data and code locally. eLabLink extends
+this workflow by automatically uploading the saved data files and
+generated figures to an eLabFTW experiment, while retaining the local copies. Uploads run asynchronously in the background, so you can continue acquiring data without waiting for network transfers. It provides the experiment object, such that you can madify the experiment attributes within your Python experimental sequence.
 
-eLabLink's optional Labmate integration keeps that local workflow and sends
-saved data and figures to eLabFTW in the background. A slow network upload does
-not hold up your next acquisition cell. Only the manager import changes:
-
-.. code-block:: python
-
-   from elablink import AcquisitionAnalysisManager
-
-   aqm = AcquisitionAnalysisManager("data")
-
-Follow :doc:`notebooks` for Jupyter and VS Code, or :doc:`scripts` for a normal
-Python script. Finish with ``aqm.close()`` to wait for pending uploads and report
-errors; closing does not save unsaved analysis changes.
-Local file writes and snapshot copies still take time; the network work is
-asynchronous. See :doc:`background_uploads` for what happens if a transfer fails.
+Previously saved data/code can also be retrieved from eLabFTW and reopened for further analysis. New analysis results and figures can then be saved back to the same experiment.
 
 .. toctree::
    :hidden:
