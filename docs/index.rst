@@ -1,7 +1,7 @@
 eLabLink
 ========
 
-eLabLink provides an intuitive, object-oriented Python interface to eLabFTW. 
+`eLabLink <https://github.com/ThibautJacqmin/elablink>__`` provides an intuitive, object-oriented Python interface to eLabFTW. 
 Experiments, resources, and their familiar GUI features are represented by 
 Python objects, properties, and methods, allowing you to interact with your 
 electronic lab notebook directly from Python.eLabLink lets you use your online 
@@ -20,9 +20,9 @@ steps, tags, custom fields, and attachments.
 Labmate integration
 ========
 
-eLabLink also integrates with `Labmate <https://kyrylo-gr.github.io/labmate/>`, a Python framework for saving and analyzing experimental data.
+eLabLink also integrates with `Labmate <https://kyrylo-gr.github.io/labmate/>__`, a Python framework for saving and analyzing experimental data.
 
-Labmate saves measurement data together with the Python code used for acquisition and analysis in HDF5 (.h5) files. This allows you to reopen previous measurements and continue analyzing them without relying on variables still present in memory. It also comes with a very useful h5 file viewer `h5viewer <https://github.com/kyrylo-gr/h5viewer>` that enables fast visualisation of h5 file content, and quickly rerun an old experimental sequence.
+Labmate saves measurement data together with the Python code used for acquisition and analysis in HDF5 (.h5) files. This allows you to reopen previous measurements and continue analyzing them without relying on variables still present in memory. It also comes with a very useful h5 file viewer: `h5viewer <https://github.com/kyrylo-gr/h5viewer>__`, that enables fast visualisation of h5 file content, and quickly rerun an old experimental sequence.
 
 Labmate saves your measurement/analysis data and code locally. eLabLink extends
 this workflow by automatically uploading the saved data files and
