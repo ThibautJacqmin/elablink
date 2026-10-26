@@ -1,7 +1,8 @@
 eLabLink
 ========
 
-`eLabLink <https://github.com/ThibautJacqmin/elablink>`__ provides an intuitive, object-oriented Python interface to eLabFTW. 
+`eLabLink <https://github.com/ThibautJacqmin/elablink>`__ provides an intuitive, 
+object-oriented Python interface to `eLabFTW <https://doc.elabftw.net/>__`. 
 Experiments, resources, and their familiar GUI features are represented by 
 Python objects, properties, and methods, allowing you to interact with your 
 electronic lab notebook directly from Python. eLabLink lets you use your online 
