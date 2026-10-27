@@ -15,7 +15,7 @@ eLabLink: a Python wrapper for eLabFTW
       steps, tags, custom fields, and attachments.
 
    .. figure:: _static/elablink-python-wrapper.png
-      :class: elablink-intro-figure
+      :figclass: elablink-intro-figure
       :alt: Python code uses eLabLink to create and update experiments and resources in eLabFTW.
       :target: _static/elablink-python-wrapper.png
 
@@ -41,6 +41,11 @@ this workflow by automatically uploading the saved data files and
 generated figures to an eLabFTW experiment, while retaining the local copies. Uploads run asynchronously in the background, so you can continue acquiring data without waiting for network transfers. It provides the experiment object, such that you can modify the experiment attributes within your Python experimental sequence.
 
 Previously saved data/code can also be retrieved from eLabFTW and reopened for further analysis. New analysis results and figures can then be saved back to the same experiment.
+
+.. figure:: _static/elablink-experimental-workflow.png
+   :width: 100%
+   :alt: Local acquisition and analysis with Labmate, optional h5viewer, and background uploads to eLabFTW through eLabLink, with data retrieval for further analysis.
+   :target: _static/elablink-experimental-workflow.png
 
 .. toctree::
    :hidden:
