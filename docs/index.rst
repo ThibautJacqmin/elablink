@@ -1,14 +1,23 @@
 eLabLink: a Python wrapper for eLabFTW
-========
+======================================
 
-`eLabLink <https://github.com/ThibautJacqmin/elablink>`__ provides an intuitive, 
-object-oriented Python interface to `eLabFTW <https://doc.elabftw.net/>`__. 
-Experiments, resources, and their familiar GUI features are represented by 
-Python objects, properties, and methods, allowing you to interact with your 
-eLabFTW electronic lab notebook directly from Python. eLabLink lets you use your online 
-scientific lab notebook directly in your Python experimental sequences.
-You can easily create an experiment or a resource, then edit its title, main text,
-steps, tags, custom fields, and attachments.
+.. container:: elablink-intro
+
+   .. container:: elablink-intro-text
+
+      `eLabLink <https://github.com/ThibautJacqmin/elablink>`__ provides an intuitive,
+      object-oriented Python interface to `eLabFTW <https://doc.elabftw.net/>`__.
+      Experiments, resources, and their familiar GUI features are represented by
+      Python objects, properties, and methods, allowing you to interact with your
+      eLabFTW electronic lab notebook directly from Python. eLabLink lets you use your online
+      scientific lab notebook directly in your Python experimental sequences.
+      You can easily create an experiment or a resource, then edit its title, main text,
+      steps, tags, custom fields, and attachments.
+
+   .. figure:: _static/elablink-python-wrapper.png
+      :class: elablink-intro-figure
+      :alt: Python code uses eLabLink to create and update experiments and resources in eLabFTW.
+      :target: _static/elablink-python-wrapper.png
 
 .. code-block:: python
 
@@ -21,7 +30,7 @@ steps, tags, custom fields, and attachments.
 
 
 eLabLink: a bridge between Labmate and eLabFTW
--------------------
+----------------------------------------------
 
 eLabLink also integrates with `Labmate <https://kyrylo-gr.github.io/labmate/>`__, a Python framework for saving and analyzing experimental data.
 
