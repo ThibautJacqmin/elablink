@@ -1,9 +1,0 @@
-eLabLink logo — physics notebook
-
-Visual direction: Thibaut Jacqmin. Image produced using the built-in image-generation tool.
-An original notebook/atom/laser icon, not an upstream logo combination or an endorsement.
-The upstream projects retain their own visual identities and rights. No legal clearance is implied.
-
-Final visual brief:
-
-An icon only: a friendly rounded open laboratory notebook, a physics experiment notebook or 'cahier de manip'. No wordmark, letters or caption. One balanced square icon with modest transparent padding. Dark scientific blue outline and restrained yellow/teal accents. A small stylized atom on the right page, formed by two or three clean elliptical orbital strokes and a central nucleus, with a straight golden-yellow laser beam travelling from the left page to the atom. One or two subtle measurement/page lines on the left. Plenty of negative space and a strong small-size silhouette. Flat vector-like edges and consistent rounded strokes. No chemical glassware, hexagon, copied partner logos, gradients, glow, 3D, shadows or mockup. An independent square icon with a genuinely transparent background.
