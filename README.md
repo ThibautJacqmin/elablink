@@ -4,6 +4,8 @@
 
 Work with your eLabFTW notebook from Python.
 
+[Documentation](https://elablink.readthedocs.io)
+
 eLabLink turns familiar eLabFTW concepts into Python objects: an `Experiment`
 for an experiment, a `Resource` for a sample or instrument, and properties and
 methods for notes, steps, tags, files and links. It is a practical interface to
@@ -37,6 +39,9 @@ background, so a slow server does not hold up the next acquisition cell.
 Labmate stores the acquisition/analysis cell code or script source with the
 data in HDF5. Measurements stored on eLabFTW can later be downloaded and reopened
 for analysis, without changing Labmate.
+
+[h5viewer](https://github.com/kyrylo-gr/h5viewer) is an optional application for
+browsing these local HDF5 files and rerunning saved analyses.
 
 ```python
 from elablink import AcquisitionAnalysisManager
@@ -105,5 +110,5 @@ eLabLink is written and maintained by **Thibaut Jacqmin**. See
 [authorship](AUTHORS.rst), [credits](docs/about.rst), [citation](CITATION.cff)
 and the [MIT licence](LICENSE).
 
-eLabFTW, elabapi-python and Labmate are independent projects with their own
-authors and licences. eLabLink is not an official product of those projects.
+eLabFTW, elabapi-python, Labmate and h5viewer are independent projects with
+their own authors and licences. eLabLink is not an official product of those projects.

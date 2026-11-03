@@ -1,8 +1,8 @@
 eLabLink release notes
 =====================
 
-0.1.0 (unreleased)
-------------------
+0.1.0
+-----
 
 * Create and edit eLabFTW experiments and resources: notes, steps, comments,
   tags, custom fields, categories, statuses, links and attachments.
@@ -14,13 +14,14 @@ eLabLink release notes
   unchanged contents when the server supplies a compatible hash.
 * Include three examples for the direct interface, Python acquisition scripts
   and Jupyter notebooks. Resource categories and statuses are optional.
+* Describe the optional h5viewer application for browsing local Labmate HDF5
+  files and rerunning saved analyses.
 
 Compatibility and limits
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Requires Python 3.10 or newer. The Labmate integration is temporarily pinned to
-the tested revision of PR #103 (see the installation guide). Its minimum released
-version will be set after the fix is merged and published. Live tests used
+Requires Python 3.10 or newer and Labmate 0.10.10 or newer for acquisition and
+analysis. Live tests used
 eLabFTW 6.0.9 and elabapi-python 5.1.0. Creation from an experiment template was
 tested offline; no accessible template was available for the live test.
 

@@ -14,10 +14,10 @@ This statement does not replace the actual contribution history in Git.
 Upstream projects
 -----------------
 
-eLabFTW, elabapi-python and Labmate are independent dependencies, with their
-own authors, contributors, licences and visual identities. Their authorship
+eLabFTW, elabapi-python, Labmate and the optional h5viewer are independent
+projects, with their own authors, contributors, licences and visual identities. Their authorship
 is not attributed to eLabLink or to Thibaut Jacqmin. eLabLink is not an
-official or endorsed product of either upstream project.
+official or endorsed product of these upstream projects.
 
 The project is distributed under the existing MIT licence in LICENSE.
 

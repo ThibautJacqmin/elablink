@@ -63,6 +63,9 @@ Associations are specific to the configured server. A required download waits
 before analysis; uploads remain asynchronous. Stored code is not executed
 automatically, and the complete notebook document is not archived.
 
+The optional `h5viewer <https://github.com/kyrylo-gr/h5viewer>`_ application can
+browse local Labmate HDF5 files and rerun saved analyses.
+
 Its ``experiment`` property returns an ``AsyncExperiment`` with queued writes:
 
 .. code-block:: python

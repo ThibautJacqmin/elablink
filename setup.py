@@ -27,12 +27,7 @@ setup(
         "tomli; python_version < '3.11'",
     ],
     extras_require={
-        # Temporary pin to the tested PR; use the containing release once published.
-        "labmate": [
-            "labmate @ git+https://github.com/kyrylo-gr/labmate.git@"
-            "7384ea7c2fe53b3fafdb2c1bdf627936a7a432a4",
-            "matplotlib",
-        ],
+        "labmate": ["labmate>=0.10.10", "matplotlib"],
         "docs": ["Sphinx>=8.2,<9", "sphinx-rtd-theme>=3.1,<4"],
     },
 )

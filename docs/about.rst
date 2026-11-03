@@ -22,12 +22,13 @@ Acknowledgements
   generated Python API client used by eLabLink.
 * `Labmate <https://github.com/kyrylo-gr/labmate>`_ provides the local acquisition
   and analysis workflow.
+* `h5viewer <https://github.com/kyrylo-gr/h5viewer>`_ is an optional application
+  for browsing Labmate HDF5 files and rerunning saved analyses.
 * NumPy and Matplotlib are used in the scientific examples; Sphinx builds this
   documentation.
 
 These projects have their own authors and licences. eLabLink is an independent
-project, not an official eLabFTW or Labmate product and not an endorsement by
-either project.
+project, not an official product of these projects or an endorsement by them.
 
 The notebook, atom and laser icon is eLabLink's own visual identity, developed
 under Thibaut Jacqmin's direction with image-generation assistance. It does not
@@ -40,6 +41,7 @@ Links
 * `eLabFTW documentation <https://doc.elabftw.net/>`_
 * `eLabFTW API documentation <https://doc.elabftw.net/api/>`_
 * `Labmate documentation <https://kyrylo-gr.github.io/labmate/>`_
+* `h5viewer source and usage <https://github.com/kyrylo-gr/h5viewer>`_
 
 This is practical laboratory software. Check your server permissions, local
 backups and the :doc:`background_uploads` limitations before an acquisition

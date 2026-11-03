@@ -45,13 +45,11 @@ For advanced use outside this project, ``Client(config_path="...")`` and the acq
 Add Labmate for acquisition/analysis
 ------------------------------------
 
-The acquisition manager currently needs the figure-saving fix in
-`Labmate PR #103 <https://github.com/kyrylo-gr/labmate/pull/103>`__.
-Until it is merged and released, install the tested PR revision in the same
-environment as eLabLink:
+The acquisition manager requires Labmate 0.10.10 or newer. Install it in the
+same environment as eLabLink:
 
 .. code-block:: console
 
-   python -m pip install "labmate @ git+https://github.com/kyrylo-gr/labmate.git@7384ea7c2fe53b3fafdb2c1bdf627936a7a432a4" matplotlib
+   python -m pip install "labmate>=0.10.10" matplotlib
 
 Set the Labmate data directory when creating the acquisition manager: ``AcquisitionAnalysisManager("data")``.
