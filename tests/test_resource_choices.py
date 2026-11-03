@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from elablink import Client, InvalidCategory, Resource
+from elablink import Client, InvalidCategory, InvalidStatus, Resource
 
 
 class ResourceChoiceTests(unittest.TestCase):
@@ -55,6 +55,28 @@ class ResourceChoiceTests(unittest.TestCase):
             with self.subTest(response=response):
                 client.resource_categories.read_items_types.return_value = response
                 self.assertEqual(client.resource_category_dict, {})
+
+    def test_disabled_resource_features_are_optional(self):
+        for response in ([], None):
+            with self.subTest(response=response):
+                client = self.client()
+                client.resource_categories.read_items_types.return_value = response
+                client._get_team_id = Mock(return_value=1)
+                client.resource_statuses = Mock()
+                client.resource_statuses.read_team_items_status.return_value = response
+                resource = Resource(api=client, title="Resource without categories")
+                client.items.post_item_with_http_info.assert_called_once_with(body={})
+                client.items.patch_item.assert_called_once_with(
+                    17, body={"title": "Resource without categories"}
+                )
+                self.assertEqual(resource.categories, {})
+                self.assertEqual(resource.statuses, {})
+                client.items.patch_item.reset_mock()
+                for field, error in (("category", InvalidCategory), ("status", InvalidStatus)):
+                    with self.subTest(field=field):
+                        with self.assertRaisesRegex(error, "feature may be disabled"):
+                            setattr(resource, field, "Missing")
+                client.items.patch_item.assert_not_called()
 
     def test_resource_uses_resource_category_choices(self):
         client = self.client()

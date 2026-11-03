@@ -1,6 +1,7 @@
 """Offline checks for existing category, status and team tag selections."""
 
 from types import SimpleNamespace
+import json
 import unittest
 from unittest.mock import Mock
 
@@ -8,6 +9,10 @@ from elablink import Client, Experiment, InvalidCategory, InvalidStatus, Invalid
 
 
 class ChoiceValidationTests(unittest.TestCase):
+    @staticmethod
+    def tag_response(rows):
+        return SimpleNamespace(data=json.dumps(rows).encode(), release_conn=Mock())
+
     def client(self):
         client = Client.__new__(Client)
         client._get_team_id = Mock(return_value=4)
@@ -30,10 +35,10 @@ class ChoiceValidationTests(unittest.TestCase):
             SimpleNamespace(title="Available", id=9)
         ]
         client.team_tags = Mock()
-        client.team_tags.read_team_tags.return_value = [
-            SimpleNamespace(tag="optics", id=11),
-            SimpleNamespace(tag="calibration", id=12),
-        ]
+        client.team_tags.read_team_tags.return_value = self.tag_response([
+            {"tag": "optics", "id": 11},
+            {"tag": "calibration", "id": 12},
+        ])
         client.tags = Mock()
         client.experiments = Mock()
         client.experiments.get_experiment.return_value.to_dict.return_value = {}
@@ -76,12 +81,22 @@ class ChoiceValidationTests(unittest.TestCase):
         experiment._cache = {"tags": "attached"}
         self.assertEqual(experiment.tags, ["attached"])
         self.assertEqual(experiment.available_tags, {"optics": 11, "calibration": 12})
-        client.team_tags.read_team_tags.return_value = [
-            SimpleNamespace(tag="new tag", id=20)
-        ]
+        client.team_tags.read_team_tags.return_value = self.tag_response([
+            {"tag": "new tag", "id": 20}
+        ])
         self.assertEqual(experiment.available_tags, {"new tag": 20})
         self.assertEqual(client.team_tags.read_team_tags.call_args_list,
-                         [unittest.mock.call(4), unittest.mock.call(4)])
+                         [unittest.mock.call(4, _preload_content=False),
+                          unittest.mock.call(4, _preload_content=False)])
+        client.team_tags.read_team_tags.return_value.release_conn.assert_called_once()
+
+    def test_invalid_tag_response_releases_http_connection(self):
+        client = self.client()
+        response = client.team_tags.read_team_tags.return_value
+        response.data = b"not JSON"
+        with self.assertRaises(json.JSONDecodeError):
+            client.tag_dict
+        response.release_conn.assert_called_once()
 
     def test_existing_team_tag_can_be_attached_to_an_untagged_entity(self):
         for entity_type, route in ((Experiment, "experiments"), (Resource, "items")):
@@ -112,7 +127,7 @@ class ChoiceValidationTests(unittest.TestCase):
 
     def test_empty_choices_are_explicit_in_error(self):
         client = self.client()
-        client.team_tags.read_team_tags.return_value = []
+        client.team_tags.read_team_tags.return_value = self.tag_response([])
         with self.assertRaisesRegex(InvalidTag, "Available tags: none"):
             Experiment(client, 17).add_tag("optics")
 

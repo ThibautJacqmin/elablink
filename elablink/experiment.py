@@ -288,13 +288,11 @@ class Experiment:
             self._load()
             return
 
-        # Official elabapi_python method for replace:
-        # POST /experiments/{id}/uploads/{subid}
-        self.api.uploads.post_upload_replace(
+        self.api.replace_upload(
             self.entity_type,
             self.ID,
             int(existing_id),
-            file=file_path,
+            file_path=file_path,
             comment=comment,
         )
         self._load()

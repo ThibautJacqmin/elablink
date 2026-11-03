@@ -3,13 +3,27 @@
 from datetime import date
 import json
 from types import SimpleNamespace
+from pathlib import Path
+import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
 
-from elablink import Experiment, Resource
+from elablink import Client, Experiment, Resource
 
 
 class EntityHelperTests(unittest.TestCase):
+    def test_replacement_explicitly_selects_replace_action(self):
+        client = Client.__new__(Client)
+        client.api_client = Mock()
+        client.replace_upload("experiments", 17, 3, "signal.h5", "New analysis")
+        kwargs = client.api_client.call_api.call_args.kwargs
+        self.assertEqual(client.api_client.call_api.call_args.args,
+                         ("/{entity_type}/{id}/uploads/{subid}", "POST"))
+        self.assertEqual(kwargs["path_params"],
+                         {"entity_type": "experiments", "id": 17, "subid": 3})
+        self.assertIn(("action", "replace"), kwargs["post_params"])
+        self.assertEqual(kwargs["files"], {"file": "signal.h5"})
+
     def entity(self, resource=False):
         api = Mock()
         api.configuration.host = "https://lab.example/api/v2"
@@ -21,6 +35,20 @@ class EntityHelperTests(unittest.TestCase):
         else:
             api.experiments.get_experiment.return_value.to_dict.return_value = data
         return entity, api, data
+
+    def test_changed_attachment_routes_to_replacement_helper(self):
+        entity, api, _ = self.entity()
+        api.uploads.read_uploads.return_value = [{"id": 3, "real_name": "signal.h5"}]
+        # Use the real helper signature so keyword mistakes fail before live tests.
+        api.replace_upload = create_autospec(Client.__new__(Client).replace_upload)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "signal.h5"
+            path.write_bytes(b"new analysis")
+            entity.upload_file(path)
+            api.replace_upload.assert_called_once_with(
+                "experiments", 17, 3, file_path=str(path), comment="Uploaded via API"
+            )
+        api.uploads.post_upload.assert_not_called()
 
     def test_date_and_custom_fields_keep_unrelated_metadata(self):
         entity, api, data = self.entity()

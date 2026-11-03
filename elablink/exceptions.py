@@ -47,6 +47,8 @@ def _choice_error(kind, name, available):
         ) or "none"
         plural = {"category": "categories", "status": "statuses", "tag": "tags"}[kind]
         message += f" Available {plural}: {choices}."
+        if not available and kind in ("category", "status"):
+            message += " This feature may be disabled, or no choices are configured for your account."
     return message
 
 

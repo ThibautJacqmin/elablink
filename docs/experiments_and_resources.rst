@@ -61,13 +61,14 @@ It has the same notes, steps, comments, tags, custom-field and file helpers:
 
    from elablink import Resource
 
-   laser = Resource(title="Blue laser", category=3)
+   laser = Resource(title="Blue laser")
    laser.main_text = "<p>Laser on the optics table.</p>"
    laser.set_extra_fields({"Wavelength (nm)": 405, "Location": "Table 2"})
    laser.add_tag("optics")
    experiment.link_resource(laser.ID)
 
-Replace ``3`` with a resource category ID or name from ``laser.categories``.
+Resource categories and statuses are optional; ``laser.categories`` and
+``laser.statuses`` are empty when disabled.
 Existing links are not added twice.
 ``laser.link_experiment(experiment.ID)`` links in the other direction if needed.
 
@@ -140,8 +141,8 @@ Runnable example
 ----------------
 
 ``examples/experiments_and_resources.py`` combines the basic operations above.
-Set ``resource_category`` and the category/status/tag names to choices from your
-server, then run it from the project root:
+Set the category/status/tag names to choices from your server, then run it from
+the project root:
 
 .. code-block:: console
 

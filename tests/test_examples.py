@@ -78,7 +78,7 @@ class ExperimentResourceExampleTests(unittest.TestCase):
             result = run_example("experiments_and_resources")
 
         create_experiment.assert_called_once_with(title="First measurement")
-        create_resource.assert_called_once_with(title="Sample A", category=3)
+        create_resource.assert_called_once_with(title="Sample A")
         self.assertIs(result["experiment"], experiment)
         self.assertIs(result["sample"], sample)
         self.assertIn("Characterisation", experiment.main_text)
@@ -100,6 +100,43 @@ class ExperimentResourceExampleTests(unittest.TestCase):
         sample.add_comment.assert_called_once_with("Ready for use.")
         experiment.link_resource.assert_called_once_with(21)
         sample.link_experiment.assert_called_once_with(11)
+
+    def test_disabled_resource_categories_or_statuses_do_not_block_other_features(self):
+        for categories, statuses in (
+            ({}, {}),
+            ({}, {"Available": 7}),
+            ({"Samples": 3}, {}),
+        ):
+            with self.subTest(categories=categories, statuses=statuses):
+                experiment = Mock(spec=Experiment)
+                experiment.categories = {"Calibration": 2}
+                experiment.statuses = {"Completed": 4}
+                experiment.available_tags = {"calibration": 5, "sample": 6}
+                experiment.ID = 11
+                step = Step(1, "Cool the sample", False, Mock())
+                experiment.steps = {step.text: step}
+                sample = Mock(spec=Resource)
+                sample.ID = 21
+                sample.categories = categories
+                sample.statuses = statuses
+                sample.category = None
+                sample.status = None
+                with (
+                    patch("elablink.Experiment", return_value=experiment),
+                    patch("elablink.Resource", return_value=sample) as create_resource,
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    run_example("experiments_and_resources")
+                create_resource.assert_called_once_with(title="Sample A")
+                self.assertEqual(sample.category, "Samples" if categories else None)
+                self.assertEqual(sample.status, "Available" if statuses else None)
+                sample.set_extra_fields.assert_called_once_with(
+                    {"Serial number": "SAMPLE-001"}
+                )
+                sample.add_tag.assert_called_once_with("sample")
+                sample.add_comment.assert_called_once_with("Ready for use.")
+                experiment.link_resource.assert_called_once_with(sample.ID)
+                sample.link_experiment.assert_called_once_with(experiment.ID)
 
     def test_duplicate_experiment_title_does_not_create_an_unused_resource(self):
         from elablink import DuplicateTitle

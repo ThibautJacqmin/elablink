@@ -17,7 +17,7 @@ experiment.main_text = "<p>Measure the laser power.</p>"
 experiment.add_step("Align the beam")
 experiment.add_comment("The signal is stable.")
 
-laser = Resource(title="Blue laser", category=3)  # Your resource category ID.
+laser = Resource(title="Blue laser")
 laser.set_extra_fields({"Wavelength (nm)": 405})
 experiment.link_resource(laser.ID)
 ```

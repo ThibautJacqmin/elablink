@@ -11,6 +11,7 @@ and templates.
 import elabapi_python as ep
 from functools import wraps
 from inspect import signature
+import json
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
@@ -100,6 +101,31 @@ class Client:
             return resp.read()  # type: ignore[no-any-return]
         # fallback: try bytes() (rare)
         return bytes(resp)
+
+    def replace_upload(
+        self,
+        entity_type: str,
+        entity_id: int,
+        upload_id: int,
+        file_path: str | Path,
+        comment: str = "Uploaded via API",
+    ) -> None:
+        """Upload a new version and archive the previous attachment.
+
+        The generated replacement method omits the multipart ``action`` field;
+        eLabFTW then creates another active file instead of replacing the old one.
+        """
+        self.api_client.call_api(
+            "/{entity_type}/{id}/uploads/{subid}",
+            "POST",
+            path_params={"entity_type": entity_type, "id": entity_id, "subid": upload_id},
+            header_params={"Accept": "application/json", "Content-Type": "multipart/form-data"},
+            post_params=[("action", "replace"), ("comment", comment)],
+            files={"file": str(file_path)},
+            auth_settings=["token"],
+            response_type=None,
+            _return_http_data_only=True,
+        )
 
     def load_experiment(self, ID: int = None, title: str = None):
         """Load an experiment by ID or by title.
@@ -246,8 +272,15 @@ class Client:
     @property
     def tag_dict(self) -> dict[str, int]:
         """Return existing tag names and IDs from the selected team."""
-        tags = self.team_tags.read_team_tags(self._get_team_id()) or []
-        return {tag.tag: tag.id for tag in tags}
+        # The generated client declares a single tag, but this endpoint returns a list.
+        response = self.team_tags.read_team_tags(
+            self._get_team_id(), _preload_content=False
+        )
+        try:
+            tags = json.loads(response.data)
+        finally:
+            response.release_conn()
+        return {tag["tag"]: int(tag["id"]) for tag in tags}
 
     @property
     def category_dict(self) -> dict[str, int]:
@@ -259,7 +292,7 @@ class Client:
 
     @property
     def resource_category_dict(self) -> dict[str, int]:
-        """Return a map of accessible resource category titles to IDs."""
+        """Return resource categories, or an empty dictionary when none are available."""
         categories = self.resource_categories.read_items_types() or []
         return {category.title: category.id for category in categories}
 
@@ -274,11 +307,11 @@ class Client:
 
     @property
     def resource_status_dict(self) -> dict[str, int]:
-        """Return a map of resource status titles to IDs."""
+        """Return resource statuses, or an empty dictionary when none are available."""
         team_id = self._get_team_id()
         return {
             s.title: s.id
-            for s in self.resource_statuses.read_team_items_status(team_id)
+            for s in self.resource_statuses.read_team_items_status(team_id) or []
         }
 
     def _get_team_id(self) -> int:
