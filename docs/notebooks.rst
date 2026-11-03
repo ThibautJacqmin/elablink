@@ -67,12 +67,15 @@ The saved figure and updated data file are queued for the same experiment.
    experiment.add_step("Sinusoid acquired and plotted.", checked=True)
    experiment.add_comment("The signal is stable.")
    experiment.set_extra_fields({"Frequency (Hz)": 5})
-   print("Categories:", experiment.categories)
-   print("Statuses:", experiment.statuses)
+   categories = list(experiment.categories)
+   statuses = list(experiment.statuses)
+   print("Categories:", categories)
+   print("Statuses:", statuses)
    print("Tags:", experiment.tags)
-   # Replace these names with choices from your server.
-   experiment.category = "Calibration"
-   experiment.status = "Completed"
+   if categories:
+       experiment.category = categories[0]
+   if statuses:
+       experiment.status = statuses[0]
    information = aqm.flush()
    print(information["url"])
    aqm.close()
@@ -92,7 +95,9 @@ Before closing, the handle also supports:
 
 .. code-block:: python
 
-   experiment.add_tag("calibration")
+   tags = list(experiment.available_tags)
+   if tags:
+       experiment.add_tag(tags[0])
    experiment.main_text = "<p>Sinusoidal signal measurement.</p>"
    experiment.set_extra_fields({"Temperature (K)": 4.2})
 

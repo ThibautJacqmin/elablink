@@ -2,7 +2,7 @@
 
 The configured eLabFTW server receives a Sinusoid experiment with the data,
 this script and the figure. Local files are kept in data/.
-Replace the category/status names below with choices from your server.
+The first available category and status are selected.
 
 Author: Thibaut Jacqmin
 """
@@ -37,12 +37,16 @@ with AcquisitionAnalysisManager("data", shell=None, use_magic=False) as aqm:
     experiment.set_extra_fields({"Frequency (Hz)": 5})
 
     # Reading choices waits for the server; do this after the measurements.
-    print("Categories:", experiment.categories)
-    print("Statuses:", experiment.statuses)
+    categories = list(experiment.categories)
+    statuses = list(experiment.statuses)
+    print("Categories:", categories)
+    print("Statuses:", statuses)
     print("Tags:", experiment.tags)
-    # Replace these names with ones shown above. These edits are queued too.
-    experiment.category = "Calibration"
-    experiment.status = "Completed"
+    # Select the first available choice. These edits are queued too.
+    if categories:
+        experiment.category = categories[0]
+    if statuses:
+        experiment.status = statuses[0]
 
     # Finish the remaining edits and report any upload error.
     info = aqm.flush()

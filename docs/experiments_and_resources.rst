@@ -14,7 +14,9 @@ Create an experiment
    experiment.main_text = "<p>Measure the laser power.</p>"
    experiment.add_step("Align the beam")
    experiment.add_comment("The signal is stable.")
-   experiment.add_tag("calibration")
+   tags = list(experiment.available_tags)
+   if tags:
+       experiment.add_tag(tags[0])
 
 ``Experiment()`` also works and starts with the title ``Untitled experiment``. Give each new experiment a meaningful title if unique titles are enabled in the configuration file.
 
@@ -64,7 +66,9 @@ It has the same notes, steps, comments, tags, custom-field and file helpers:
    laser = Resource(title="Blue laser")
    laser.main_text = "<p>Laser on the optics table.</p>"
    laser.set_extra_fields({"Wavelength (nm)": 405, "Location": "Table 2"})
-   laser.add_tag("optics")
+   tags = list(laser.available_tags)
+   if tags:
+       laser.add_tag(tags[0])
    experiment.link_resource(laser.ID)
 
 Resource categories and statuses are optional; ``laser.categories`` and
@@ -141,7 +145,7 @@ Runnable example
 ----------------
 
 ``examples/experiments_and_resources.py`` combines the basic operations above.
-Set the category/status/tag names to choices from your server, then run it from
+It selects existing categories, statuses and tags when available. Run it from
 the project root:
 
 .. code-block:: console
@@ -149,8 +153,7 @@ the project root:
    python examples/experiments_and_resources.py
 
 Read the example before running or importing it: it creates real records.
-Change the experiment title directly in the script when running again if
-unique experiment titles are enabled. There are no command-line arguments.
+Each run uses a timestamped experiment title. There are no command-line arguments.
 
 .. literalinclude:: ../examples/experiments_and_resources.py
    :language: python

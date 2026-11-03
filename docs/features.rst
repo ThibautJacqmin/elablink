@@ -69,7 +69,9 @@ Its ``experiment`` property returns an ``AsyncExperiment`` with queued writes:
 
    experiment.add_step("...")
    experiment.add_comment("...")
-   experiment.add_tag("...")
+   tags = list(experiment.available_tags)
+   if tags:
+       experiment.add_tag(tags[0])
    experiment.main_text = "..."
    experiment.set_extra_fields({"Temperature (K)": 4.2})
 

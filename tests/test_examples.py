@@ -60,16 +60,17 @@ class ExperimentResourceExampleTests(unittest.TestCase):
     def test_creates_and_links_entities_with_visible_resource_category(self):
         experiment = Mock(spec=Experiment)
         experiment.ID = 11
-        experiment.categories = {"Calibration": 2}
-        experiment.statuses = {"Completed": 4}
-        experiment.available_tags = {"calibration": 5, "sample": 6}
+        experiment.categories = {"Spectroscopy": 29, "Cooling": 71}
+        experiment.statuses = {"Reviewed": 34, "Draft": 88}
+        experiment.available_tags = {"optics": 51, "beam": 63}
         update_step = Mock()
         step = Step(1, "Cool the sample", False, update_step)
         experiment.steps = {step.text: step}
         sample = Mock(spec=Resource)
         sample.ID = 21
-        sample.categories = {"Samples": 3}
-        sample.statuses = {"Available": 7}
+        sample.categories = {"Instruments": 102, "Materials": 203}
+        sample.statuses = {"Ready": 57, "In use": 91}
+        sample.available_tags = {"instrument": 72, "sample": 86}
         with (
             patch("elablink.Experiment", return_value=experiment) as create_experiment,
             patch("elablink.Resource", return_value=sample) as create_resource,
@@ -77,14 +78,15 @@ class ExperimentResourceExampleTests(unittest.TestCase):
         ):
             result = run_example("experiments_and_resources")
 
-        create_experiment.assert_called_once_with(title="First measurement")
+        create_experiment.assert_called_once()
+        self.assertTrue(create_experiment.call_args.kwargs["title"].startswith("First measurement "))
         create_resource.assert_called_once_with(title="Sample A")
         self.assertIs(result["experiment"], experiment)
         self.assertIs(result["sample"], sample)
         self.assertIn("Characterisation", experiment.main_text)
         experiment.set_extra_fields.assert_called_once_with({"Temperature (K)": 4.2})
-        self.assertEqual(experiment.category, "Calibration")
-        self.assertEqual(experiment.status, "Completed")
+        self.assertEqual(experiment.category, "Spectroscopy")
+        self.assertEqual(experiment.status, "Reviewed")
         self.assertEqual(
             experiment.add_step.call_args_list,
             [call("Cool the sample"), call("Record the signal", checked=True)],
@@ -92,26 +94,26 @@ class ExperimentResourceExampleTests(unittest.TestCase):
         self.assertTrue(step.status)
         update_step.assert_called_once_with(1, True)
         experiment.add_comment.assert_called_once_with("The signal is stable.")
-        experiment.add_tag.assert_called_once_with("calibration")
+        experiment.add_tag.assert_called_once_with("optics")
         sample.set_extra_fields.assert_called_once_with({"Serial number": "SAMPLE-001"})
-        self.assertEqual(sample.category, "Samples")
-        self.assertEqual(sample.status, "Available")
-        sample.add_tag.assert_called_once_with("sample")
+        self.assertEqual(sample.category, "Instruments")
+        self.assertEqual(sample.status, "Ready")
+        sample.add_tag.assert_called_once_with("instrument")
         sample.add_comment.assert_called_once_with("Ready for use.")
         experiment.link_resource.assert_called_once_with(21)
         sample.link_experiment.assert_called_once_with(11)
 
     def test_disabled_resource_categories_or_statuses_do_not_block_other_features(self):
-        for categories, statuses in (
-            ({}, {}),
-            ({}, {"Available": 7}),
-            ({"Samples": 3}, {}),
+        for categories, statuses, tags in (
+            ({}, {}, {}),
+            ({}, {"Ready": 57}, {"instrument": 72}),
+            ({"Instruments": 102}, {}, {}),
         ):
-            with self.subTest(categories=categories, statuses=statuses):
+            with self.subTest(categories=categories, statuses=statuses, tags=tags):
                 experiment = Mock(spec=Experiment)
-                experiment.categories = {"Calibration": 2}
-                experiment.statuses = {"Completed": 4}
-                experiment.available_tags = {"calibration": 5, "sample": 6}
+                experiment.categories = {"Spectroscopy": 29}
+                experiment.statuses = {"Reviewed": 34}
+                experiment.available_tags = {"optics": 51}
                 experiment.ID = 11
                 step = Step(1, "Cool the sample", False, Mock())
                 experiment.steps = {step.text: step}
@@ -119,6 +121,7 @@ class ExperimentResourceExampleTests(unittest.TestCase):
                 sample.ID = 21
                 sample.categories = categories
                 sample.statuses = statuses
+                sample.available_tags = tags
                 sample.category = None
                 sample.status = None
                 with (
@@ -128,15 +131,46 @@ class ExperimentResourceExampleTests(unittest.TestCase):
                 ):
                     run_example("experiments_and_resources")
                 create_resource.assert_called_once_with(title="Sample A")
-                self.assertEqual(sample.category, "Samples" if categories else None)
-                self.assertEqual(sample.status, "Available" if statuses else None)
+                self.assertEqual(sample.category, "Instruments" if categories else None)
+                self.assertEqual(sample.status, "Ready" if statuses else None)
                 sample.set_extra_fields.assert_called_once_with(
                     {"Serial number": "SAMPLE-001"}
                 )
-                sample.add_tag.assert_called_once_with("sample")
+                if tags:
+                    sample.add_tag.assert_called_once_with("instrument")
+                else:
+                    sample.add_tag.assert_not_called()
                 sample.add_comment.assert_called_once_with("Ready for use.")
                 experiment.link_resource.assert_called_once_with(sample.ID)
                 sample.link_experiment.assert_called_once_with(experiment.ID)
+
+    def test_empty_experiment_choices_do_not_block_other_features(self):
+        experiment = Mock(spec=Experiment)
+        experiment.ID = 11
+        experiment.categories = {}
+        experiment.statuses = {}
+        experiment.available_tags = {}
+        experiment.category = None
+        experiment.status = None
+        step = Step(1, "Cool the sample", False, Mock())
+        experiment.steps = {step.text: step}
+        sample = Mock(spec=Resource)
+        sample.ID = 21
+        sample.categories = {}
+        sample.statuses = {}
+        sample.available_tags = {}
+        with (
+            patch("elablink.Experiment", return_value=experiment),
+            patch("elablink.Resource", return_value=sample),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            run_example("experiments_and_resources")
+        self.assertIsNone(experiment.category)
+        self.assertIsNone(experiment.status)
+        experiment.add_tag.assert_not_called()
+        sample.add_tag.assert_not_called()
+        experiment.add_comment.assert_called_once_with("The signal is stable.")
+        experiment.link_resource.assert_called_once_with(sample.ID)
 
     def test_duplicate_experiment_title_does_not_create_an_unused_resource(self):
         from elablink import DuplicateTitle
@@ -175,8 +209,8 @@ if HAS_ACQUISITION:
 
         def __init__(self):
             super().__init__()
-            self.categories = {"Calibration": 2}
-            self.statuses = {"Completed": 4}
+            self.categories = {"Spectroscopy": 29, "Cooling": 71}
+            self.statuses = {"Reviewed": 34, "Draft": 88}
             self.category = None
             self.status = None
             self.checked_steps = {}
@@ -200,10 +234,17 @@ if HAS_ACQUISITION:
             }
 
     class ExampleClient(EditableClient):
+        def __init__(self, *, empty_choices=False):
+            super().__init__()
+            self.empty_choices = empty_choices
+
         def create_experiment(self, *, title):
             previous = super().create_experiment(title=title)
             experiment = ExampleExperiment()
             experiment.ID = previous.ID
+            if self.empty_choices:
+                experiment.categories = {}
+                experiment.statuses = {}
             self.experiments[title] = experiment
             return experiment
 
@@ -231,7 +272,7 @@ class AcquisitionExampleTests(unittest.TestCase):
             namespace = run_example("labmate_acquisition")
         return namespace, managers[0], namespace["info"]
 
-    def check_uploaded_signal(self, remote):
+    def check_uploaded_signal(self, remote, *, category="Spectroscopy", status="Reviewed"):
         h5 = next(
             content for name, content in remote.files.items() if name.endswith(".h5")
         )
@@ -249,8 +290,8 @@ class AcquisitionExampleTests(unittest.TestCase):
         self.assertEqual(remote.checked_steps, {1: True})
         self.assertEqual(remote.comments, ["The signal is stable."])
         self.assertEqual(remote.extra_fields, {"Frequency (Hz)": 5})
-        self.assertEqual(remote.category, "Calibration")
-        self.assertEqual(remote.status, "Completed")
+        self.assertEqual(remote.category, category)
+        self.assertEqual(remote.status, status)
         return acquisition_source, analysis_source
 
     def test_script_uploads_signal_source_figure_and_notes_then_drains_worker(self):
@@ -271,6 +312,15 @@ class AcquisitionExampleTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(RuntimeError, "closed"):
                 manager.experiment.add_step("Too late")
+
+    def test_script_uploads_when_no_category_or_status_is_configured(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            client = ExampleClient(empty_choices=True)
+            _, manager, information = self.run_script(Path(temporary) / "data", client)
+            self.assertEqual(information["id"], 1)
+            self.check_uploaded_signal(client.experiments["Sinusoid"],
+                                       category=None, status=None)
+            self.assertTrue(all(row["state"] == "done" for row in manager.upload_status()))
 
     def test_upload_failure_surfaces_and_preserves_local_data(self):
         with tempfile.TemporaryDirectory() as temporary:

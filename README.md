@@ -97,6 +97,8 @@ python -m sphinx -W --keep-going -b html docs docs/_build/html
 Open `docs/_build/html/index.html`. Building the documentation does not run the
 examples or contact a server.
 
+See the [release notes](CHANGELOG.rst) for compatibility and known limitations.
+
 ## Author and acknowledgements
 
 eLabLink is written and maintained by **Thibaut Jacqmin**. See
