@@ -12,6 +12,10 @@ import elabapi_python as ep
 from functools import wraps
 from inspect import signature
 from pathlib import Path
+import re
+from urllib.parse import urlsplit
+import warnings
+from urllib3.exceptions import InsecureRequestWarning
 from .config import resolve_config_path
 from .experiment import Experiment
 from .resource import Resource
@@ -57,6 +61,7 @@ class Client:
         self.resource_statuses = ep.ResourcesStatusApi(self.api_client)
         self.templates = ep.ExperimentsTemplatesApi(self.api_client)
         self.tags = ep.TagsApi(self.api_client)
+        self.team_tags = ep.TeamTagsApi(self.api_client)
         self.item_links = ep.LinksToItemsApi(self.api_client)
         self.experiment_links = ep.LinksToExperimentsApi(self.api_client)
         self._team_id: int | None = None
@@ -132,14 +137,11 @@ class Client:
 
         ``category`` accepts an accessible resource category name or numeric ID.
         """
-        category_id = category
-        if isinstance(category, str):
-            try:
-                category_id = int(category)
-            except ValueError:
-                category_id = Resource._resolve_existing_id(
-                    category, self.resource_category_dict, InvalidCategory
-                )
+        category_id = None
+        if category is not None:
+            category_id = Resource._resolve_existing_id(
+                category, self.resource_category_dict, InvalidCategory
+            )
         body = {}
         if category_id is not None:
             body["category_id"] = int(category_id)
@@ -173,15 +175,9 @@ class Client:
 
     def _resolve_category_id(self, category: Union[int, str]) -> int:
         """Resolve a category name or ID to a valid category ID."""
-        categories = self.category_dict
-        if isinstance(category, int):
-            if category in categories.values():
-                return category
-            raise InvalidCategory(str(category))
-        resolved = categories.get(category)
-        if resolved is None:
-            raise InvalidCategory(category)
-        return int(resolved)
+        return Experiment._resolve_existing_id(
+            category, self.category_dict, InvalidCategory
+        )
 
     def experiment_creation_wrapper(func):
         """Decorator to normalize experiment creation and return Experiment."""
@@ -246,6 +242,12 @@ class Client:
     def resources_dict(self) -> dict[str, int]:
         """Return a map of accessible resource titles to IDs."""
         return {item.title: item.id for item in self.items.read_items()}
+
+    @property
+    def tag_dict(self) -> dict[str, int]:
+        """Return existing tag names and IDs from the selected team."""
+        tags = self.team_tags.read_team_tags(self._get_team_id()) or []
+        return {tag.tag: tag.id for tag in tags}
 
     @property
     def category_dict(self) -> dict[str, int]:
@@ -333,6 +335,19 @@ class Client:
         self.configuration.api_key["api_key"] = self.config["API_KEY"]
         self.configuration.api_key_prefix["api_key"] = "Authorization"
         self.configuration.verify_ssl = self.config["VERIFY_SSL"].lower() == "true"
+        host = urlsplit(self.configuration.host)
+        if not self.configuration.verify_ssl and host.scheme == "https" and host.hostname:
+            # Keep the certificate warning visible once for this server.
+            warnings.filterwarnings(
+                "once",
+                message=(
+                    "^Unverified HTTPS request is being made to host '"
+                    + re.escape(host.hostname)
+                    + r"'\."
+                ),
+                category=InsecureRequestWarning,
+                module=r"^urllib3\.connectionpool$",
+            )
         self.api_client = ep.ApiClient(self.configuration)
         self.api_client.set_default_header(
             header_name="Authorization",

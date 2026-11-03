@@ -31,7 +31,7 @@ Copy ``elablink.conf.example`` to ``elablink.conf`` in the project root or in an
 
 With ``UNIQUE_EXPERIMENTS_TITLES=true``, creating another experiment with the same exact title raises ``DuplicateTitle``  
 
-TEAM_ID is optional and selects the team used to retrieve categories and statuses. If not set, eLabLink tries to identify the current team.
+TEAM_ID is optional and selects the team used to retrieve categories, statuses and tags. If not set, eLabLink tries to identify the current team.
 
 The configuration file location is declared in the root ``pyproject.toml``:
 

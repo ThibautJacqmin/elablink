@@ -2,7 +2,7 @@
 
 Set ELABLINK_LIVE_TESTS=1 and ELABLINK_CONFIG to a configuration file before
 running. Test records are intentionally left on the server for inspection.
-No team categories or statuses are created or removed.
+No team categories, statuses or tags are created or removed.
 """
 
 import os
@@ -38,6 +38,10 @@ class TestExperimentIntegration(unittest.TestCase):
         raise AssertionError(message)
 
     def test_experiment_properties_and_attachment_round_trip(self):
+        available_tags = self.client.tag_dict
+        if not available_tags:
+            self.skipTest("Create a team tag in eLabFTW before running this live test")
+        tag = next(iter(available_tags))
         token = uuid.uuid4().hex
         experiment = self.client.create_experiment(f"ELABLINK TEST {token}")
         experiment.title = f"ELABLINK TEST {token} UPDATED"
@@ -48,9 +52,9 @@ class TestExperimentIntegration(unittest.TestCase):
         self.assertEqual(
             experiment.metadata["extra_fields"]["Integration test"]["value"], token
         )
-        experiment.add_tag("elablink-integration-test")
+        experiment.add_tag(tag)
         self.wait_for(
-            lambda: experiment.has_tag("elablink-integration-test"), "Tag not visible"
+            lambda: experiment.has_tag(tag), "Tag not visible"
         )
         experiment.add_step("Check the upload")
         self.wait_for(

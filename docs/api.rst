@@ -45,9 +45,9 @@ available; consult the `Labmate documentation
 Queued experiment edits
 -----------------------
 
-The manager supplies this write-only handle after saving an acquisition or a
-figure, or after opening a remote file for analysis. It does not expose a
-synchronous experiment object to the notebook.
+The manager supplies this handle after saving an acquisition or a figure, or
+after opening a remote file for analysis. Edits are queued; explicit metadata
+reads fetch automatically and wait for the server.
 
 .. autoclass:: elablink.async_experiment.AsyncExperiment
    :members:

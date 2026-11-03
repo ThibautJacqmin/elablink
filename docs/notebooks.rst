@@ -64,8 +64,15 @@ The saved figure and updated data file are queued for the same experiment.
 .. code-block:: python
 
    experiment = aqm.experiment
-   experiment.add_step("Sinusoid acquired and plotted.")
+   experiment.add_step("Sinusoid acquired and plotted.", checked=True)
    experiment.add_comment("The signal is stable.")
+   experiment.set_extra_fields({"Frequency (Hz)": 5})
+   print("Categories:", experiment.categories)
+   print("Statuses:", experiment.statuses)
+   print("Tags:", experiment.tags)
+   # Replace these names with choices from your server.
+   experiment.category = "Calibration"
+   experiment.status = "Completed"
    information = aqm.flush()
    print(information["url"])
    aqm.close()
@@ -89,10 +96,10 @@ Before closing, the handle also supports:
    experiment.main_text = "<p>Sinusoidal signal measurement.</p>"
    experiment.set_extra_fields({"Temperature (K)": 4.2})
 
-``main_text`` replaces the main text. This small, write-only handle is not the
-direct :class:`~elablink.experiment.Experiment` object: it does not fetch remote properties
-or attachments. For those operations, use ``Client`` separately as described in
-:doc:`experiments_and_resources`.
+``main_text`` replaces the main text. Reading steps, categories, statuses or tags
+fetches them automatically and waits for the server; edits remain asynchronous.
+Tags must already exist; ``experiment.available_tags`` lists the choices.
+For text reads and attachments, use ``Client`` as described in :doc:`experiments_and_resources`.
 
 Which eLabFTW experiment?
 -------------------------

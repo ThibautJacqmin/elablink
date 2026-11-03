@@ -67,12 +67,21 @@ class ResourceChoiceTests(unittest.TestCase):
         resource.category = "optical TABLES"
         client.items.patch_item.assert_called_once_with(17, body={"category": 7})
 
-    def test_numeric_category_assignment_does_not_require_choice_lookup(self):
+    def test_numeric_category_assignment_validates_against_current_choices(self):
         client = self.client()
         resource = Resource(client, 17)
-        resource.category = 99
-        client.items.patch_item.assert_called_once_with(17, body={"category": 99})
-        client.resource_categories.read_items_types.assert_not_called()
+        resource.category = 3
+        client.items.patch_item.assert_called_once_with(17, body={"category": 3})
+        client.resource_categories.read_items_types.assert_called_once_with()
+
+    def test_unknown_numeric_category_does_not_modify_resource(self):
+        for category in (99, "99"):
+            with self.subTest(category=category):
+                client = self.client()
+                resource = Resource(client, 17)
+                with self.assertRaisesRegex(InvalidCategory, "Lasers"):
+                    resource.category = category
+                client.items.patch_item.assert_not_called()
 
     def test_unknown_category_name_does_not_modify_resource(self):
         client = self.client()
@@ -93,18 +102,27 @@ class ResourceChoiceTests(unittest.TestCase):
             17, body={"title": "Blue laser", "category": 3}
         )
 
-    def test_create_resource_keeps_numeric_selection_without_lookup(self):
-        for category in (99, "99"):
+    def test_create_resource_validates_numeric_selection(self):
+        for category in (3, "3"):
             with self.subTest(category=category):
                 client = self.client()
                 client.create_resource("Blue laser", category=category)
                 client.items.post_item_with_http_info.assert_called_once_with(
-                    body={"category_id": 99}
+                    body={"category_id": 3}
                 )
                 client.items.patch_item.assert_called_once_with(
-                    17, body={"title": "Blue laser", "category": 99}
+                    17, body={"title": "Blue laser", "category": 3}
                 )
-                client.resource_categories.read_items_types.assert_not_called()
+                client.resource_categories.read_items_types.assert_called_once_with()
+
+    def test_unknown_numeric_category_is_rejected_before_resource_creation(self):
+        for category in (99, "99"):
+            with self.subTest(category=category):
+                client = self.client()
+                with self.assertRaisesRegex(InvalidCategory, "Lasers"):
+                    client.create_resource("Blue laser", category=category)
+                client.items.post_item_with_http_info.assert_not_called()
+                client.items.patch_item.assert_not_called()
 
     def test_create_resource_without_category_keeps_server_default(self):
         client = self.client()

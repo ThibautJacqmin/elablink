@@ -1,4 +1,4 @@
-"""Offline checks of cached dictionaries and experiment-bound checkbox edits."""
+"""Offline checks of automatic metadata reads and queued checkbox edits."""
 
 from concurrent.futures import Future
 from contextlib import suppress
@@ -8,7 +8,7 @@ import tempfile
 import threading
 import unittest
 
-from elablink import AsyncBridge, AsyncExperiment
+from elablink import AsyncBridge, AsyncExperiment, InvalidTag
 
 
 class DictionaryExperiment:
@@ -17,6 +17,10 @@ class DictionaryExperiment:
         self.rows = [{"ID": 7, "text": "Align the beam", "status": False}]
         self._category = "Calibration"
         self._status = "Planned"
+        self._tags = ["optics"]
+        self._available_tags = {"optics": 11, "calibration": 12}
+        self._categories = {"Calibration": 2, "Measurement": 3}
+        self._statuses = {"Planned": 4, "Completed": 5}
         self.calls = []
         self.started = threading.Event()
         self.release = None
@@ -49,12 +53,28 @@ class DictionaryExperiment:
     @property
     def categories(self):
         self.record("categories")
-        return {"Calibration": 2, "Measurement": 3}
+        return self._categories
 
     @property
     def statuses(self):
         self.record("statuses")
-        return {"Planned": 4, "Completed": 5}
+        return self._statuses
+
+    @property
+    def tags(self):
+        self.record("tags")
+        return self._tags
+
+    @property
+    def available_tags(self):
+        self.record("available_tags")
+        return self._available_tags
+
+    def add_tag(self, tag):
+        self.record("add tag")
+        if tag not in self._available_tags:
+            raise InvalidTag(tag, self._available_tags)
+        self._tags.append(tag)
 
     @property
     def category(self):
@@ -122,22 +142,50 @@ class AsyncStepDictionaryTests(unittest.TestCase):
         prerequisite.set_result(None)
         return AsyncExperiment(self.bridge, remote.ID, str(remote.ID), prerequisite)
 
-    def test_reads_require_explicit_refresh_without_server_access(self):
-        for field in ("steps", "categories", "statuses", "category", "status"):
-            with self.subTest(field=field):
-                with self.assertRaisesRegex(RuntimeError, "refresh"):
-                    getattr(self.handle, field)
-        self.assertEqual(self.remote.calls, [])
+    def test_reads_fetch_automatically_on_worker_without_explicit_refresh(self):
+        self.assertEqual(list(self.handle.steps), ["Align the beam"])
+        self.assertEqual(self.handle.categories["Calibration"], 2)
+        self.assertEqual(self.handle.statuses["Completed"], 5)
+        self.assertEqual(self.handle.category, "Calibration")
+        self.assertEqual(self.handle.status, "Planned")
+        self.assertEqual(self.handle.tags, ["optics"])
+        self.assertEqual(self.handle.available_tags["calibration"], 12)
+        self.assertTrue(all(t != threading.get_ident() for _, t in self.remote.calls))
 
-    def test_refresh_is_queued_and_reads_are_cached(self):
+    def test_catalog_reads_fetch_only_requested_choices_and_see_server_edits(self):
+        self.assertEqual(self.handle.categories["Calibration"], 2)
+        self.assertEqual([name for name, _ in self.remote.calls], ["categories"])
+        self.remote._categories["New category"] = 6
+        self.remote._statuses["New status"] = 8
+        self.remote._available_tags["new tag"] = 13
+        self.assertEqual(self.handle.categories["New category"], 6)
+        self.assertEqual(self.handle.statuses["New status"], 8)
+        self.assertEqual(self.handle.available_tags["new tag"], 13)
+        self.assertNotIn("refresh", [name for name, _ in self.remote.calls])
+
+    def test_attached_tags_are_fresh_independent_lists_and_follow_queued_edits(self):
+        tags = self.handle.tags
+        tags.append("local only")
+        self.remote._tags.append("added in browser")
+        self.assertEqual(self.handle.tags, ["optics", "added in browser"])
+        self.handle.add_tag("calibration")
+        self.assertEqual(self.handle.tags, ["optics", "added in browser", "calibration"])
+
+    def test_missing_tag_error_lists_choices_in_future_and_flush(self):
+        future = self.handle.add_tag("missing")
+        with self.assertRaisesRegex(InvalidTag, r"Available tags: 'optics' \(ID 11\)"):
+            future.result(timeout=3)
+        with self.assertRaisesRegex(RuntimeError, "Available tags: 'optics'"):
+            self.bridge.flush(timeout=3)
+        self.assertEqual(self.remote._tags, ["optics"])
+
+    def test_refresh_remains_optional_and_queued(self):
         release = threading.Event()
         self.releases.append(release)
         self.remote.release = release
         future = self.handle.refresh()
         self.assertTrue(self.remote.started.wait(2))
         self.assertFalse(future.done())
-        with self.assertRaisesRegex(RuntimeError, "refresh"):
-            _ = self.handle.steps
         release.set()
         future.result(timeout=3)
         count = len(self.remote.calls)
@@ -147,7 +195,7 @@ class AsyncStepDictionaryTests(unittest.TestCase):
         self.assertEqual(self.handle.statuses["Completed"], 5)
         self.assertEqual(self.handle.category, "Calibration")
         self.assertEqual(self.handle.status, "Planned")
-        self.assertEqual(len(self.remote.calls), count)
+        self.assertGreater(len(self.remote.calls), count)
         self.assertTrue(all(t != threading.get_ident() for _, t in self.remote.calls))
 
     def test_step_assignment_uses_stable_id_and_does_not_wait(self):
@@ -165,13 +213,13 @@ class AsyncStepDictionaryTests(unittest.TestCase):
         self.assertTrue(step.status)
         self.assertTrue(self.handle.steps["Renamed on server"].status)
 
-    def test_writes_update_only_loaded_affected_cache_fields(self):
+    def test_writes_do_not_refetch_unrelated_catalogs(self):
         self.handle.refresh().result(timeout=3)
         count = sum(name == "categories" for name, _ in self.remote.calls)
         self.handle.add_step("Measure power", checked=True)
         self.handle.check_step("Align the beam")
-        self.handle.category = self.handle.categories["Measurement"]
-        self.handle.status = self.handle.statuses["Completed"]
+        self.handle.category = 3
+        self.handle.status = 5
         self.bridge.flush(timeout=3)
         self.assertTrue(self.handle.steps["Measure power"].status)
         self.assertTrue(self.handle.steps["Align the beam"].status)
@@ -179,7 +227,7 @@ class AsyncStepDictionaryTests(unittest.TestCase):
         self.assertEqual(self.handle.status, "Completed")
         self.assertEqual(sum(name == "categories" for name, _ in self.remote.calls), count)
 
-    def test_shared_cache_and_step_handle_stay_bound_after_switching(self):
+    def test_reads_and_step_handle_stay_bound_after_switching(self):
         self.handle.refresh().result(timeout=3)
         same = self.make_handle(self.remote)
         other_remote = DictionaryExperiment(2)
@@ -190,8 +238,7 @@ class AsyncStepDictionaryTests(unittest.TestCase):
         self.assertTrue(self.handle.steps["Align the beam"].status)
         self.assertFalse(other_remote.rows[0]["status"])
         self.assertEqual(other_remote.calls, [])
-        with self.assertRaisesRegex(RuntimeError, "refresh"):
-            _ = other.steps
+        self.assertFalse(other.steps["Align the beam"].status)
 
     def test_dictionary_changes_do_not_mutate_cached_choices(self):
         self.handle.refresh().result(timeout=3)
@@ -215,14 +262,18 @@ class AsyncStepDictionaryTests(unittest.TestCase):
         self.bridge.flush(timeout=3)
         self.assertTrue(self.handle.steps_by_id[7].status)
 
-    def test_refresh_error_preserves_snapshot_and_is_reported(self):
+    def test_failed_fresh_read_reports_error_instead_of_returning_stale_snapshot(self):
         self.handle.refresh().result(timeout=3)
         self.remote._category = "Measurement"
         self.remote.fail_refresh = True
         future = self.handle.refresh()
         with self.assertRaisesRegex(RuntimeError, "refresh failed"):
             future.result(timeout=3)
-        self.assertEqual(self.handle.category, "Calibration")
+        self.assertEqual(self.bridge._experiment_states[1]["category"], "Calibration")
+        with self.assertRaisesRegex(RuntimeError, "refresh failed"):
+            _ = self.handle.category
+        self.remote.fail_refresh = False
+        self.assertEqual(self.handle.category, "Measurement")
         with self.assertRaisesRegex(RuntimeError, "eLabFTW jobs failed"):
             self.bridge.flush(timeout=3)
 

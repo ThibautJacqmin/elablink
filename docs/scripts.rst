@@ -3,7 +3,8 @@ Acquisition in a Python script
 
 Use the same local-save, background-upload workflow outside Jupyter. The
 example ``examples/labmate_acquisition.py`` generates a sinusoid, saves the data
-and a PNG, adds a step and comment to the eLabFTW experiment, and prints its link.
+and a PNG, edits the eLabFTW experiment's steps, comments, category and status,
+and prints its link. Replace the category/status names with choices from your server.
 
 After :doc:`installation`, run it from the project root:
 

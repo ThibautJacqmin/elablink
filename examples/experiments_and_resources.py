@@ -1,7 +1,7 @@
 """Create and link an experiment and a resource in eLabFTW.
 
 This example creates real records on your server. Replace the category ID
-and category/status names with choices from your installation (printed below).
+and category/status/tag names with choices from your installation (printed below).
 Choose a new experiment title on each run if unique titles are enabled.
 
 Author: Thibaut Jacqmin
@@ -18,9 +18,10 @@ resource_category = 3  # Replace with your resource category ID.
 experiment = Experiment(title="First measurement")
 print("Experiment categories:", experiment.categories)
 print("Experiment statuses:", experiment.statuses)
+print("Available tags:", experiment.available_tags)
 # Replace these names with ones shown above.
-experiment.category = experiment.categories["Calibration"]
-experiment.status = experiment.statuses["Completed"]
+experiment.category = "Calibration"
+experiment.status = "Completed"
 experiment.main_text = "<p>Characterisation of Sample A.</p>"
 experiment.started_on = date.today()
 experiment.set_extra_fields({"Temperature (K)": 4.2})
@@ -35,8 +36,8 @@ sample = Resource(title="Sample A", category=resource_category)
 print("Resource categories:", sample.categories)
 print("Resource statuses:", sample.statuses)
 # Replace these names with ones shown above.
-sample.category = sample.categories["Samples"]
-sample.status = sample.statuses["Available"]
+sample.category = "Samples"
+sample.status = "Available"
 sample.main_text = "<p>A sample used for the measurement.</p>"
 sample.set_extra_fields({"Serial number": "SAMPLE-001"})
 sample.add_tag("sample")

@@ -39,18 +39,36 @@ class InvalidID(ELabError):
         super().__init__(f"{ID} does not exist")
 
 
+def _choice_error(kind, name, available):
+    message = f"{kind.capitalize()} '{name}' not found."
+    if available is not None:
+        choices = ", ".join(
+            f"{title!r} (ID {ID})" for title, ID in available.items()
+        ) or "none"
+        plural = {"category": "categories", "status": "statuses", "tag": "tags"}[kind]
+        message += f" Available {plural}: {choices}."
+    return message
+
+
 class InvalidCategory(ELabError):
     """Raised when a category lookup fails."""
 
-    def __init__(self, name: str):
-        super().__init__(f"Category '{name}' not found.")
+    def __init__(self, name: str, available=None):
+        super().__init__(_choice_error("category", name, available))
 
 
 class InvalidStatus(ELabError):
     """Raised when a status lookup fails."""
 
-    def __init__(self, name: str):
-        super().__init__(f"Status '{name}' not found.")
+    def __init__(self, name: str, available=None):
+        super().__init__(_choice_error("status", name, available))
+
+
+class InvalidTag(ELabError):
+    """Raised when a tag is absent from the team's existing tags."""
+
+    def __init__(self, name: str, available=None):
+        super().__init__(_choice_error("tag", name, available))
 
 
 class DeletedExperiment(ELabError):

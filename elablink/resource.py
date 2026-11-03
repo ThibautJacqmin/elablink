@@ -39,14 +39,9 @@ class Resource(Experiment):
 
     @category.setter
     def category(self, category_name: str | int):
-        if isinstance(category_name, int):
-            category_id = category_name
-        elif isinstance(category_name, str):
-            category_id = self._resolve_existing_id(
-                category_name, self._category_values(), InvalidCategory
-            )
-        else:
-            raise InvalidCategory(str(category_name))
+        category_id = self._resolve_existing_id(
+            category_name, self._category_values(), InvalidCategory
+        )
         self._sync({"category": category_id})
 
     def _status_values(self) -> dict[str, int]:

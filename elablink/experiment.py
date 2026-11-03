@@ -9,7 +9,7 @@ remote eLabFTW experiments and their attachments, tags, steps, and comments.
 
 from __future__ import annotations
 
-from .exceptions import InvalidStatus, InvalidCategory, DeletedExperiment
+from .exceptions import InvalidStatus, InvalidCategory, InvalidTag, DeletedExperiment
 from .step import Step
 from datetime import date, datetime
 from html import escape
@@ -41,7 +41,7 @@ class Experiment:
             ID: Existing record identifier. Omit to create a new record.
             title: Title for a new record; defaults to "Untitled experiment"
                 ("Untitled resource" for resources).
-            category: Category for a new record; resource categories use numeric IDs.
+            category: Category name or ID for a new record.
             config_path: Optional configuration override when ``api`` is omitted.
                 Otherwise use the root project's configuration setting.
 
@@ -180,10 +180,12 @@ class Experiment:
         invalid_exc,
     ) -> int:
         """Resolve a name or ID to a valid ID or raise."""
-        if isinstance(selection, int):
-            if selection in values.values():
+        if isinstance(selection, int) and not isinstance(selection, bool):
+            if selection in (int(value) for value in values.values()):
                 return selection
-            raise invalid_exc(str(selection))
+            raise invalid_exc(str(selection), values)
+        if not isinstance(selection, str):
+            raise invalid_exc(str(selection), values)
         selected_id = values.get(selection)
         if selected_id is None:
             folded = str(selection).casefold()
@@ -192,7 +194,15 @@ class Experiment:
                 None,
             )
         if selected_id is None:
-            raise invalid_exc(selection)
+            try:
+                numeric_id = int(selection)
+            except ValueError:
+                numeric_id = None
+            if numeric_id is not None and numeric_id in (
+                int(value) for value in values.values()
+            ):
+                return numeric_id
+            raise invalid_exc(selection, values)
         return int(selected_id)
 
     def _select_existing_upload(self, uploads: Any, real_name: str) -> Optional[Any]:
@@ -438,7 +448,10 @@ class Experiment:
         self._load()
 
     def add_tag(self, tag: str):
-        """Attach a tag to the experiment."""
+        """Attach an existing team tag; reject unknown names without creating tags."""
+        available = self.available_tags
+        if not isinstance(tag, str) or tag not in available:
+            raise InvalidTag(str(tag), available)
         self.api.tags.post_tag(self.entity_type, self.ID, body={"tag": tag})
         self._load()
 
@@ -487,6 +500,11 @@ class Experiment:
             InvalidCategory,
         )
         self._sync({"category": category_id})
+
+    @property
+    def available_tags(self) -> dict[str, int]:
+        """Available team tag names and IDs, distinct from this record's tags."""
+        return dict(self.api.tag_dict)
 
     @property
     def tags(self):

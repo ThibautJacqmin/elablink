@@ -468,7 +468,8 @@ class AsyncBridge:
         if failures:
             raise RuntimeError(
                 f"{len(failures)} eLabFTW jobs failed; "
-                f"any failed upload snapshots remain in {self.spool_directory}"
+                f"{failures[0]}. "
+                f"Any failed upload snapshots remain in {self.spool_directory}"
             ) from failures[0]
         return jobs[-1].future.result() if jobs else {}
 

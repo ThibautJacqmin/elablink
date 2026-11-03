@@ -19,6 +19,7 @@ from .exceptions import (
     InvalidCategory,
     InvalidID,
     InvalidStatus,
+    InvalidTag,
     InvalidTemplate,
     InvalidTitle,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "InvalidCategory",
     "InvalidID",
     "InvalidStatus",
+    "InvalidTag",
     "InvalidTemplate",
     "InvalidTitle",
 ]

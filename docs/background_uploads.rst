@@ -121,8 +121,8 @@ guarantees delivery in those circumstances. Preserve local backups.
 Other boundaries
 ----------------
 
-* The asynchronous handle supports a small set of experiment edits, not
-  resource edits or fresh server reads.
+* The asynchronous handle supports experiment edits and metadata reads. Explicit
+  reads wait for the server; resource edits and attachment reads use ``Client``.
 * Remote analysis requires an explicit experiment ID and HDF5 attachment filename;
   a missing local ``filepath`` is not silently replaced by a download.
 * Attachment replacement is best-effort. If listing existing attachments fails,

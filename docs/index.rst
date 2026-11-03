@@ -52,6 +52,7 @@ Previously saved data/code can also be retrieved from eLabFTW and reopened for f
    :maxdepth: 2
    :caption: Get started
 
+   Overview <self>
    installation
    experiments_and_resources
 

@@ -23,7 +23,7 @@ They share these operations:
    * - Custom fields
      - Read/write ``metadata``; create/update typed fields with ``set_extra_fields``.
    * - Steps
-     - List, append and ensure steps; set completion through ``ensure_step``.
+     - Append with ``add_step(checked=True)``; check an existing step with ``steps["name"].status = True``.
    * - Comments
      - List and append comments.
    * - Tags
@@ -40,8 +40,8 @@ existing named templates, and exposes title/category/status dictionaries.
 Loads accept a numeric ID or exact title. Properties are cached; ``refresh()``
 fetches the current record.
 
-Resource categories take numeric IDs; experiment categories and status setters
-accept existing names or IDs. There is no resource-template helper.
+Category and status setters accept existing names or IDs; tags must already exist.
+There is no resource-template helper.
 Attachment hashes can avoid reuploading unchanged contents when supported by
 the server. See :doc:`background_uploads` for limits.
 
@@ -74,8 +74,9 @@ Its ``experiment`` property returns an ``AsyncExperiment`` with queued writes:
    experiment.set_extra_fields({"Temperature (K)": 4.2})
 
 ``body`` is an alias for ``main_text``. The handle stays bound to its experiment.
-Use the direct interface for remote reads and other operations. No asynchronous
-resource handle is provided.
+Reading steps, categories, statuses or tags fetches them automatically and waits
+for the server. Writes remain queued. Use the direct interface for attachments
+and other operations. No asynchronous resource handle is provided.
 
 Not every GUI operation
 -----------------------

@@ -18,7 +18,8 @@ Create an experiment
 
 ``Experiment()`` also works and starts with the title ``Untitled experiment``. Give each new experiment a meaningful title if unique titles are enabled in the configuration file.
 
-``main_text``, or identically ``body`` replace the main text
+``main_text`` and its alias ``body`` replace the main text.
+Tags must already exist on your server; ``experiment.available_tags`` lists the choices.
 
 
 Edit properties and custom fields
@@ -29,11 +30,12 @@ Edit properties and custom fields
    experiment.title = "Blue laser calibration"
    experiment.started_on = "2026-10-25"
    experiment.set_extra_fields({"Power (mW)": 2.5, "Operator": "Thibaut"})
-   experiment.ensure_step("Check the power", finished=True)
+   experiment.add_step("Check the power", checked=True)
+   experiment.steps["Align the beam"].status = True
 
 ``started_on`` (also named ``date``) is the editable date, not the creation
-timestamp. ``ensure_step()`` adds a missing step and can set its completion
-state without accidentally toggling it again on a repeated call.
+timestamp. ``add_step()`` creates a step; assigning its ``status`` checks or
+unchecks an existing step. Repeated step names can be accessed through ``steps_by_id``.
 
 The corresponding readable properties include:
 
@@ -45,8 +47,8 @@ The corresponding readable properties include:
    print(experiment.tags)
    print(experiment.metadata)
 
-Values are cached after fetching. Call ``experiment.refresh()`` to see a change
-made by somebody in the browser. Custom fields are part of ``metadata``;
+``experiment.refresh()`` reloads record properties changed in the browser.
+Category and status choices are fetched when queried. Custom fields are part of ``metadata``;
 ``set_extra_fields()`` merges the supplied fields by default.
 
 Create a resource
@@ -65,8 +67,8 @@ It has the same notes, steps, comments, tags, custom-field and file helpers:
    laser.add_tag("optics")
    experiment.link_resource(laser.ID)
 
-Replace ``3`` with a resource category ID from your server. Resource categories
-currently use numeric IDs, not names. Existing links are not added twice.
+Replace ``3`` with a resource category ID or name from ``laser.categories``.
+Existing links are not added twice.
 ``laser.link_experiment(experiment.ID)`` links in the other direction if needed.
 
 Load a record instead of creating another
@@ -90,13 +92,14 @@ reuse one configured connection for several records.
 
    print(client.category_dict)
    print(client.status_dict)
+   print(client.resource_category_dict)
    print(client.resource_status_dict)
 
    # Choose names that actually exist on your server:
    # experiment.category = "Measurement"
    # experiment.status = "Finished"
 
-Experiment categories and both status setters accept an existing name or
+Category and status setters accept an existing name or
 integer ID. To use an existing experiment template:
 
 .. code-block:: python
@@ -137,7 +140,7 @@ Runnable example
 ----------------
 
 ``examples/experiments_and_resources.py`` combines the basic operations above.
-Set ``resource_category`` near the top of the file to a category ID from your
+Set ``resource_category`` and the category/status/tag names to choices from your
 server, then run it from the project root:
 
 .. code-block:: console

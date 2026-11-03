@@ -1,4 +1,4 @@
-"""Experiment-bound queued edits and explicitly refreshed metadata snapshots.
+"""Experiment-bound queued edits and automatic metadata reads.
 
 @author Thibaut Jacqmin
 """
@@ -25,10 +25,9 @@ class AsyncExperiment:
     Methods return Futures; errors are also reported by ``aqm.flush()`` and
     ``aqm.close()``. Text assignment is queued too, not confirmed immediately.
 
-    ``refresh()`` queues a metadata refresh. After it completes, ``steps``,
-    ``categories``, ``statuses``, ``category`` and ``status`` read cached values
-    without a network wait. Refresh again to see changes made outside this handle.
-    Text remains write-only. This is not a synchronous ``Experiment``.
+    Reading metadata fetches it on the worker and waits for the result, including
+    any earlier queued jobs. No explicit ``refresh()`` is needed. Text remains
+    write-only. This is not a synchronous ``Experiment``.
     Pending edits live in memory and are not replayed after a kernel restart.
     """
 
@@ -50,18 +49,9 @@ class AsyncExperiment:
         self,
         operation: Callable[[Any], Any],
         label: str,
-        *,
-        refresh_fields: tuple[str, ...] = (),
     ) -> Future:
-        def apply(experiment):
-            operation(experiment)
-            with self._bridge._experiment_state_lock:
-                cached = self._key in self._bridge._experiment_states
-            if cached and refresh_fields:
-                self._cache_fields(experiment, refresh_fields)
-
         return self._bridge._submit_experiment_edit(
-            self._key, self._title, self._prerequisite, apply, label
+            self._key, self._title, self._prerequisite, operation, label
         )
 
     def _cache_fields(self, experiment: Any, fields: tuple[str, ...]) -> None:
@@ -73,7 +63,7 @@ class AsyncExperiment:
                 values[field] = tuple(
                     (step.ID, step.text, step.status) for step in value.values()
                 )
-            elif field in ("categories", "statuses"):
+            elif field in ("categories", "statuses", "available_tags"):
                 values[field] = dict(value)
             else:
                 values[field] = value
@@ -81,35 +71,36 @@ class AsyncExperiment:
             previous = self._bridge._experiment_states.get(self._key, {})
             self._bridge._experiment_states[self._key] = {**previous, **values}
 
-    def _read_cached(self, field: str) -> Any:
-        self._bridge._check_owner()
+    def _read(self, field: str) -> Any:
+        """Fetch only the requested metadata, keeping HTTP on the worker."""
+        def read_metadata(experiment):
+            if field in ("steps", "category", "status", "tags"):
+                experiment.refresh()
+            self._cache_fields(experiment, (field,))
+
+        self._submit(read_metadata, f"read experiment {field}").result(timeout=120)
         with self._bridge._experiment_state_lock:
-            state = self._bridge._experiment_states.get(self._key)
-            if state is None or field not in state:
-                raise RuntimeError(
-                    "Queue experiment.refresh() and wait for it with aqm.flush() "
-                    "before reading cached experiment metadata"
-                )
-            return deepcopy(state[field])
+            return deepcopy(self._bridge._experiment_states[self._key][field])
 
     def refresh(self) -> Future:
-        """Queue a fresh metadata snapshot; read it after this Future completes.
+        """Queue a metadata refresh without waiting for HTTP.
 
         The caller never waits for HTTP. Use ``aqm.flush()`` or this Future's
-        ``result()`` when an explicit wait is appropriate. Existing snapshots
-        remain available if the refresh fails.
+        ``result()`` when an explicit wait is appropriate. Property reads fetch
+        automatically, so calling this method first is optional.
         """
         def refresh_metadata(experiment):
             experiment.refresh()
             self._cache_fields(
-                experiment, ("steps", "categories", "statuses", "category", "status")
+                experiment,
+                ("steps", "categories", "statuses", "category", "status", "tags"),
             )
 
         return self._submit(refresh_metadata, "experiment metadata")
 
     @property
     def steps_by_id(self) -> dict[int, Step]:
-        """Cached steps keyed by ID, retaining repeated labels."""
+        """Fetch steps keyed by ID, retaining repeated labels."""
         return {
             ID: Step(
                 ID,
@@ -117,12 +108,12 @@ class AsyncExperiment:
                 status,
                 lambda step_id, checked: self.check_step(step_id, checked=checked),
             )
-            for ID, text, status in self._read_cached("steps")
+            for ID, text, status in self._read("steps")
         }
 
     @property
     def steps(self) -> dict[str, Step]:
-        """Cached named steps whose checkbox assignments queue bound edits."""
+        """Fetch named steps whose checkbox assignments queue bound edits."""
         result = {}
         for step in self.steps_by_id.values():
             if step.text in result:
@@ -134,38 +125,46 @@ class AsyncExperiment:
 
     @property
     def categories(self) -> dict[str, int]:
-        """Cached available category names and IDs."""
-        return self._read_cached("categories")
+        """Fetch available category names and IDs, waiting for the server."""
+        return self._read("categories")
 
     @property
     def statuses(self) -> dict[str, int]:
-        """Cached available status names and IDs."""
-        return self._read_cached("statuses")
+        """Fetch available status names and IDs, waiting for the server."""
+        return self._read("statuses")
+
+    @property
+    def tags(self) -> list[str]:
+        """Fetch the tags attached to this experiment."""
+        return self._read("tags")
+
+    @property
+    def available_tags(self) -> dict[str, int]:
+        """Fetch the team's available tag names and IDs."""
+        return self._read("available_tags")
 
     @property
     def category(self) -> str | int | None:
-        """Last refreshed or successfully edited category."""
-        return self._read_cached("category")
+        """Fetch this experiment's current category."""
+        return self._read("category")
 
     @category.setter
     def category(self, value: str | int) -> None:
         self._submit(
             lambda experiment: setattr(experiment, "category", value),
             "experiment category",
-            refresh_fields=("category",),
         )
 
     @property
     def status(self) -> str | int | None:
-        """Last refreshed or successfully edited experiment status."""
-        return self._read_cached("status")
+        """Fetch this experiment's current status."""
+        return self._read("status")
 
     @status.setter
     def status(self, value: str | int) -> None:
         self._submit(
             lambda experiment: setattr(experiment, "status", value),
             "experiment status",
-            refresh_fields=("status",),
         )
 
     def add_step(self, text: str, *, checked: bool = False) -> Future:
@@ -179,9 +178,7 @@ class AsyncExperiment:
             else:
                 experiment.add_step(text)
 
-        return self._submit(
-            add, "experiment step", refresh_fields=("steps",)
-        )
+        return self._submit(add, "experiment step")
 
     def check_step(
         self,
@@ -198,7 +195,6 @@ class AsyncExperiment:
                 text_or_ID, checked=checked, occurrence=occurrence
             ),
             "experiment step checkbox",
-            refresh_fields=("steps",),
         )
 
     def add_comment(self, text: str) -> Future:

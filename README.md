@@ -95,7 +95,7 @@ python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 Open `docs/_build/html/index.html`. Building the documentation does not run the
-examples or contact a server. See [development](docs/contributing.rst) for tests.
+examples or contact a server.
 
 ## Author and acknowledgements
 

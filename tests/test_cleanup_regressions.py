@@ -1,6 +1,5 @@
 """Offline regressions for the eLabLink API cleanup."""
 
-import importlib
 import json
 import subprocess
 import sys
@@ -219,11 +218,8 @@ class CleanupContractTests(unittest.TestCase):
             with self.subTest(entity=entity_class.__name__):
                 self.assertFalse(hasattr(entity_class, "remove_tag"))
                 self.assertFalse(hasattr(entity_class, "clear_tags"))
-        self.assertFalse(hasattr(elablink, "InvalidTag"))
-        self.assertNotIn("InvalidTag", elablink.__all__)
-        self.assertFalse(
-            hasattr(importlib.import_module("elablink.exceptions"), "InvalidTag")
-        )
+        self.assertTrue(issubclass(elablink.InvalidTag, elablink.ELabError))
+        self.assertIn("InvalidTag", elablink.__all__)
 
     def test_bridge_payload_tags_preserve_existing_tags(self):
         tags = ["existing"]

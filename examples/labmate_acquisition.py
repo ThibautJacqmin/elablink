@@ -36,14 +36,13 @@ with AcquisitionAnalysisManager("data", shell=None, use_magic=False) as aqm:
     experiment.add_comment("The signal is stable.")
     experiment.set_extra_fields({"Frequency (Hz)": 5})
 
-    # Measurements are finished: wait explicitly to read the available choices.
-    experiment.refresh()
-    aqm.flush()
+    # Reading choices waits for the server; do this after the measurements.
     print("Categories:", experiment.categories)
     print("Statuses:", experiment.statuses)
+    print("Tags:", experiment.tags)
     # Replace these names with ones shown above. These edits are queued too.
-    experiment.category = experiment.categories["Calibration"]
-    experiment.status = experiment.statuses["Completed"]
+    experiment.category = "Calibration"
+    experiment.status = "Completed"
 
     # Finish the remaining edits and report any upload error.
     info = aqm.flush()
