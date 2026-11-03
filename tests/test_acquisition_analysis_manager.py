@@ -23,7 +23,7 @@ try:
         AcquisitionAnalysisManager as LabmateAcquisitionAnalysisManager,
     )
 
-    HAS_LABMATE_HOOK = hasattr(LifecycleHooks, "add_analysis_figure_saved")
+    HAS_LABMATE_HOOK = hasattr(LifecycleHooks, "add_figure_saved")
 except ImportError:
     HAS_LABMATE_HOOK = False
 
@@ -98,7 +98,7 @@ class OptionalLabmateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
-@unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with analysis_figure_saved")
+@unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with figure_saved(AnalysisData)")
 class AcquisitionAnalysisManagerTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -296,7 +296,7 @@ class AcquisitionAnalysisManagerTests(unittest.TestCase):
         hooks.add_acquisition_saved(
             lambda acquisition, **kwargs: saved.append(acquisition)
         )
-        hooks.add_analysis_figure_saved(
+        hooks.add_figure_saved(
             lambda analysis, **kwargs: figures.append(analysis)
         )
         manager = self.manager(

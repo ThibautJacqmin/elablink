@@ -290,7 +290,7 @@ class AsyncExperimentTests(ExperimentTestCase):
             experiment.body = "Too late"
 
 
-@unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with analysis_figure_saved")
+@unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with figure_saved(AnalysisData)")
 class ManagerExperimentTests(ExperimentTestCase):
     def manager(self, client, **kwargs):
         from elablink import AcquisitionAnalysisManager

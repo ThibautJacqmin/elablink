@@ -27,9 +27,7 @@ class Resource(Experiment):
         self._load()
 
     def _category_values(self) -> dict[str, int]:
-        # The generated client version used by elablink has no endpoint for
-        # enumerating resource categories. Numeric category IDs still work.
-        return {}
+        return self.api.resource_category_dict
 
     @property
     def category(self):
@@ -40,9 +38,15 @@ class Resource(Experiment):
         return str(value) if value is not None else None
 
     @category.setter
-    def category(self, category_id: int):
-        if not isinstance(category_id, int):
-            raise InvalidCategory(str(category_id))
+    def category(self, category_name: str | int):
+        if isinstance(category_name, int):
+            category_id = category_name
+        elif isinstance(category_name, str):
+            category_id = self._resolve_existing_id(
+                category_name, self._category_values(), InvalidCategory
+            )
+        else:
+            raise InvalidCategory(str(category_name))
         self._sync({"category": category_id})
 
     def _status_values(self) -> dict[str, int]:

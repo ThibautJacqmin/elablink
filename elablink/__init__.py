@@ -11,6 +11,7 @@ from .bridge import Bridge
 from .client import Client
 from .experiment import Experiment
 from .resource import Resource
+from .step import Step
 from .exceptions import (
     DeletedExperiment,
     DuplicateTitle,
@@ -30,6 +31,7 @@ __all__ = [
     "Client",
     "Experiment",
     "Resource",
+    "Step",
     "DeletedExperiment",
     "DuplicateTitle",
     "ELabError",

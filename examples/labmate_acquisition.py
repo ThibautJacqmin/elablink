@@ -2,6 +2,7 @@
 
 The configured eLabFTW server receives a Sinusoid experiment with the data,
 this script and the figure. Local files are kept in data/.
+Replace the category/status names below with choices from your server.
 
 Author: Thibaut Jacqmin
 """
@@ -31,10 +32,19 @@ with AcquisitionAnalysisManager("data", shell=None, use_magic=False) as aqm:
 
     # This handle edits the experiment in the same background queue.
     experiment = aqm.experiment
-    experiment.add_step("Sinusoid acquired and plotted.")
+    experiment.add_step("Sinusoid acquired and plotted.", checked=True)
     experiment.add_comment("The signal is stable.")
     experiment.set_extra_fields({"Frequency (Hz)": 5})
 
-    # Wait only at the end, and report any upload error.
+    # Measurements are finished: wait explicitly to read the available choices.
+    experiment.refresh()
+    aqm.flush()
+    print("Categories:", experiment.categories)
+    print("Statuses:", experiment.statuses)
+    # Replace these names with ones shown above. These edits are queued too.
+    experiment.category = experiment.categories["Calibration"]
+    experiment.status = experiment.statuses["Completed"]
+
+    # Finish the remaining edits and report any upload error.
     info = aqm.flush()
     print(info["url"])

@@ -71,5 +71,4 @@ Previously saved data/code can also be retrieved from eLabFTW and reopened for f
 
    features
    api
-   contributing
    about

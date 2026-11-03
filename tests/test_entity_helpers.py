@@ -64,9 +64,9 @@ class EntityHelperTests(unittest.TestCase):
         entity, api, data = self.entity()
         data["steps"] = [{"id": 4, "body": "Measure", "finished": 1}]
         api.steps.read_steps.return_value = data["steps"]
-        self.assertFalse(entity.ensure_step("Measure", finished=True))
+        self.assertTrue(entity.check_step("Measure").status)
         api.steps.patch_step.assert_not_called()
-        entity.ensure_step("Measure", finished=False)
+        entity.check_step("Measure", checked=False)
         api.steps.patch_step.assert_called_once_with(
             "experiments", 17, 4, body={"action": "finish"}
         )
@@ -78,7 +78,7 @@ class EntityHelperTests(unittest.TestCase):
             {"id": 5, "body": "Measure", "finished": 0},
         ]
         api.steps.read_steps.return_value = data["steps"]
-        self.assertFalse(entity.ensure_step("Measure", occurrence=1, finished=True))
+        self.assertTrue(entity.check_step("Measure", occurrence=1).status)
         api.steps.patch_step.assert_called_once_with(
             "experiments", 17, 5, body={"action": "finish"}
         )

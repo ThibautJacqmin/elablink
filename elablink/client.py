@@ -52,6 +52,7 @@ class Client:
         self.steps = ep.StepsApi(self.api_client)
         self.comments = ep.CommentsApi(self.api_client)
         self.categories = ep.ExperimentsCategoriesApi(self.api_client)
+        self.resource_categories = ep.ItemsTypesApi(self.api_client)
         self.statuses = ep.ExperimentsStatusApi(self.api_client)
         self.resource_statuses = ep.ResourcesStatusApi(self.api_client)
         self.templates = ep.ExperimentsTemplatesApi(self.api_client)
@@ -126,21 +127,28 @@ class Client:
             return experiment
         raise InvalidID(ID)
 
-    def create_resource(self, title: str, category: int | None = None) -> Resource:
+    def create_resource(self, title: str, category: str | int | None = None) -> Resource:
         """Create an eLabFTW resource/item.
 
-        Resource categories are installation-specific, so ``category`` is a
-        numeric eLabFTW category ID.
+        ``category`` accepts an accessible resource category name or numeric ID.
         """
+        category_id = category
+        if isinstance(category, str):
+            try:
+                category_id = int(category)
+            except ValueError:
+                category_id = Resource._resolve_existing_id(
+                    category, self.resource_category_dict, InvalidCategory
+                )
         body = {}
-        if category is not None:
-            body["category_id"] = int(category)
+        if category_id is not None:
+            body["category_id"] = int(category_id)
         _, _, headers = self.items.post_item_with_http_info(body=body)
         resource_id = int(headers["Location"].rstrip("/").split("/")[-1])
         resource = Resource(self, resource_id)
         updates = {"title": title}
-        if category is not None:
-            updates["category"] = int(category)
+        if category_id is not None:
+            updates["category"] = int(category_id)
         resource._sync(updates)
         return resource
 
@@ -246,6 +254,12 @@ class Client:
         team_id = self._get_team_id()
         cats = self.categories.read_team_experiments_categories(team_id)
         return {cat.title: cat.id for cat in cats}
+
+    @property
+    def resource_category_dict(self) -> dict[str, int]:
+        """Return a map of accessible resource category titles to IDs."""
+        categories = self.resource_categories.read_items_types() or []
+        return {category.title: category.id for category in categories}
 
     @property
     def status_dict(self) -> dict[str, int]:

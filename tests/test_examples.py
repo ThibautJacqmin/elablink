@@ -109,7 +109,7 @@ try:
     from elablink import AcquisitionAnalysisManager
     from tests.test_async_experiment import EditableClient
 
-    HAS_ACQUISITION = hasattr(LifecycleHooks, "add_analysis_figure_saved")
+    HAS_ACQUISITION = hasattr(LifecycleHooks, "add_figure_saved")
 except ImportError:
     HAS_ACQUISITION = False
 

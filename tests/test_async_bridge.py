@@ -22,7 +22,7 @@ try:
     from labmate.acquisition import LifecycleHooks
     from labmate.acquisition_notebook import AcquisitionAnalysisManager
 
-    HAS_LABMATE_HOOK = hasattr(LifecycleHooks, "add_analysis_figure_saved")
+    HAS_LABMATE_HOOK = hasattr(LifecycleHooks, "add_figure_saved")
 except ImportError:
     HAS_LABMATE_HOOK = False
 
@@ -107,17 +107,27 @@ class AsyncBridgeTests(BridgeTestCase):
     def test_attach_validates_both_hooks_before_registering(self):
         adapter = self.adapter(OfflineClient())
         old_hooks = SimpleNamespace(add_acquisition_saved=Mock())
-        with self.assertRaisesRegex(TypeError, "analysis_figure_saved"):
+        with self.assertRaisesRegex(TypeError, "figure_saved"):
             adapter.attach(old_hooks)
         old_hooks.add_acquisition_saved.assert_not_called()
         hooks = SimpleNamespace(
-            add_acquisition_saved=Mock(), add_analysis_figure_saved=Mock()
+            add_acquisition_saved=Mock(), add_figure_saved=Mock()
         )
         adapter.attach(hooks)
         with self.assertRaisesRegex(RuntimeError, "already attached"):
             adapter.attach(hooks)
         hooks.add_acquisition_saved.assert_called_once()
-        hooks.add_analysis_figure_saved.assert_called_once()
+        hooks.add_figure_saved.assert_called_once_with(adapter._on_figure_saved)
+
+    def test_removed_hook_is_not_used_as_a_fallback(self):
+        adapter = self.adapter(OfflineClient())
+        hooks = SimpleNamespace(
+            add_acquisition_saved=Mock(), add_analysis_figure_saved=Mock()
+        )
+        with self.assertRaisesRegex(TypeError, "figure_saved"):
+            adapter.attach(hooks)
+        hooks.add_acquisition_saved.assert_not_called()
+        hooks.add_analysis_figure_saved.assert_not_called()
 
     def test_close_drains_work_and_rejects_further_submissions(self):
         client = OfflineClient()
@@ -180,7 +190,7 @@ class AsyncBridgeTests(BridgeTestCase):
         self.assertEqual(len(list(adapter.spool_directory.rglob("*.h5"))), 1)
 
 
-@unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with analysis_figure_saved")
+@unittest.skipUnless(HAS_LABMATE_HOOK, "Requires Labmate with figure_saved(AnalysisData)")
 class AsyncBridgeIntegrationTests(BridgeTestCase):
     def manager(self):
         return AcquisitionAnalysisManager(

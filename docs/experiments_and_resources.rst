@@ -1,9 +1,7 @@
 Experiments and resources
 =========================
 
-Use this interface as you would the corresponding parts of the eLabFTW GUI.
-An object represents a server record; changing a property edits that record.
-Labmate is not involved. Calls are synchronous and modify your real server.
+Create and manage your eLabFTW experiments and resources directly from Python. The Experiment and Resource classes let you work with familiar notebook features: titles, main text, steps, tags, custom fields, and attachments. Changes made through these objects are saved directly to eLabFTW and can be viewed in the web interface.
 
 Create an experiment
 --------------------
@@ -18,11 +16,10 @@ Create an experiment
    experiment.add_comment("The signal is stable.")
    experiment.add_tag("calibration")
 
-``Experiment()`` also works and starts with the title ``Untitled experiment``.
-Give each new experiment a meaningful title if unique titles are enabled.
+``Experiment()`` also works and starts with the title ``Untitled experiment``. Give each new experiment a meaningful title if unique titles are enabled in the configuration file.
 
-``main_text`` replaces the main text; use ``add_comment()`` to append a separate
-note. ``body`` is another name for ``main_text``.
+``main_text``, or identically ``body`` replace the main text
+
 
 Edit properties and custom fields
 ---------------------------------

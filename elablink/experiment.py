@@ -10,6 +10,7 @@ remote eLabFTW experiments and their attachments, tags, steps, and comments.
 from __future__ import annotations
 
 from .exceptions import InvalidStatus, InvalidCategory, DeletedExperiment
+from .step import Step
 from datetime import date, datetime
 from html import escape
 import hashlib
@@ -331,46 +332,103 @@ class Experiment:
         destination.write_bytes(payload)
         return destination
 
-    def add_step(self, text: str):
-        """Append a step to the experiment."""
-        self.api.steps.post_step(self.entity_type, self.ID, body={"body": text})
+    def add_step(self, text: str, *, checked: bool = False) -> Step:
+        """Append a step, optionally check its box, and return that exact step."""
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Step text must be a nonempty string")
+        if not isinstance(checked, bool):
+            raise TypeError("checked must be True or False")
+        _, _, headers = self.api.steps.post_step_with_http_info(
+            self.entity_type, self.ID, body={"body": text}
+        )
+        location = headers.get("Location") or headers.get("location")
+        if not location:
+            raise RuntimeError(
+                "The server created a step but returned no Location header"
+            )
+        step_id = int(location.rstrip("/").split("/")[-1])
         self._load()
+        step = Step(step_id, text, False, self._set_step_status)
+        if checked:
+            step.status = True
+        return step
 
-    def ensure_step(
-        self, text: str, *, finished: bool | None = None, occurrence: int = 0
-    ) -> bool:
-        """Ensure a step exists and optionally set its completion state.
+    def _read_steps(self) -> list[Any]:
+        rows = list(self.api.steps.read_steps(self.entity_type, self.ID) or [])
+        if self._cache is not None:
+            self._cache["steps"] = rows
+        return rows
 
-        Return whether a new step was created. Completion is read before the
-        API's toggle action so retries do not accidentally uncheck a step.
-        ``occurrence`` identifies repeated labels by their zero-based position.
+    @staticmethod
+    def _step_status(row: Any) -> bool:
+        value = Experiment._get_attr(row, "finished", 0)
+        if isinstance(value, str):
+            return value.lower() in ("1", "true")
+        return value in (True, 1)
+
+    def _step(self, row: Any) -> Step:
+        return Step(
+            int(self._get_attr(row, "id")),
+            self._get_attr(row, "body", ""),
+            self._step_status(row),
+            self._set_step_status,
+        )
+
+    def _update_step(self, row: Any, checked: bool) -> Step:
+        if self._step_status(row) != checked:
+            self.api.steps.patch_step(
+                self.entity_type,
+                self.ID,
+                int(self._get_attr(row, "id")),
+                body={"action": "finish"},
+            )
+            self._load()
+        return Step(
+            int(self._get_attr(row, "id")),
+            self._get_attr(row, "body", ""),
+            checked,
+            self._set_step_status,
+        )
+
+    def _set_step_status(self, step_id: int, checked: bool) -> Step:
+        return self.check_step(step_id, checked=checked)
+
+    def check_step(
+        self,
+        text: str | int,
+        *,
+        checked: bool = True,
+        occurrence: int | None = None,
+    ) -> Step:
+        """Set an existing step's checkbox, without creating or blindly toggling it.
+
+        Use exact text or a stable step ID. Repeated labels require an explicit
+        zero-based ``occurrence`` or an ID, so another step is never chosen silently.
         """
-        if not isinstance(occurrence, int) or occurrence < 0:
+        if not isinstance(checked, bool):
+            raise TypeError("checked must be True or False")
+        if isinstance(text, bool) or not isinstance(text, (str, int)):
+            raise TypeError("Use the exact step text or its integer ID")
+        if occurrence is not None and (
+            isinstance(occurrence, bool)
+            or not isinstance(occurrence, int)
+            or occurrence < 0
+        ):
             raise ValueError("occurrence must be a nonnegative integer")
-        matching_count = self.steps.count(text)
-        added = matching_count <= occurrence
-        while matching_count <= occurrence:
-            self.add_step(text)
-            matching_count += 1
-        if finished is not None:
-            remote_steps = self.api.steps.read_steps(self.entity_type, self.ID) or []
-            matches = [
-                step for step in remote_steps if self._get_attr(step, "body") == text
-            ]
-            if len(matches) <= occurrence:
-                raise RuntimeError(f"Step {text!r} was not returned by the server")
-            step = matches[occurrence]
-            current = self._get_attr(step, "finished", 0)
-            is_finished = current in (True, 1, "1", "true")
-            if is_finished != bool(finished):
-                self.api.steps.patch_step(
-                    self.entity_type,
-                    self.ID,
-                    int(self._get_attr(step, "id")),
-                    body={"action": "finish"},
-                )
-                self._load()
-        return added
+        if isinstance(text, int) and occurrence is not None:
+            raise ValueError("occurrence applies to step text, not an ID")
+        field = "id" if isinstance(text, int) else "body"
+        matches = [
+            row for row in self._read_steps() if self._get_attr(row, field) == text
+        ]
+        if not matches:
+            raise KeyError(f"No step matches {text!r}")
+        if occurrence is None and len(matches) > 1:
+            raise ValueError(f"Several steps match {text!r}; specify an occurrence or ID")
+        index = 0 if occurrence is None else occurrence
+        if index >= len(matches):
+            raise IndexError(f"Step {text!r} has no occurrence {index}")
+        return self._update_step(matches[index], checked)
 
     def add_comment(self, text: str):
         """Append a comment to the experiment."""
@@ -454,27 +512,45 @@ class Experiment:
         return names
 
     @property
+    def steps_by_id(self) -> dict[int, Step]:
+        """Steps keyed by stable ID, including repeated step texts."""
+        rows = self._data.get("steps")
+        if rows is None:
+            rows = self._read_steps()
+        return {
+            int(self._get_attr(row, "id")): self._step(row)
+            for row in rows
+            if self._get_attr(row, "body") is not None
+        }
+
+    @property
     def steps(self):
-        """Experiment steps as a list of strings."""
-        steps = self._data.get("steps")
-        if steps is not None:
-            return [
-                self._get_attr(data, "body")
-                for data in steps
-                if self._get_attr(data, "body") is not None
-            ]
-        steps_api = getattr(self.api, "steps", None)
-        if steps_api is None or not hasattr(steps_api, "read_steps"):
-            return []
-        try:
-            remote_steps = steps_api.read_steps(self.entity_type, self.ID)
-        except Exception:
-            return []
-        return [
-            self._get_attr(data, "body")
-            for data in remote_steps or []
-            if self._get_attr(data, "body") is not None
-        ]
+        """Steps keyed by exact text; edit a checkbox with ``steps[text].status``.
+
+        Dictionary reads use cached steps when available. Call ``refresh()`` to
+        reload external edits. Duplicate labels are rejected, not overwritten;
+        ``steps_by_id`` and ``check_step(text, occurrence=...)`` still work.
+        """
+        result = {}
+        for step in self.steps_by_id.values():
+            text = step.text
+            if text in result:
+                raise ValueError(
+                    f"Several steps match {text!r}; "
+                    "use steps_by_id or check_step with an ID or occurrence"
+                )
+            result[text] = step
+        return result
+
+    @property
+    def categories(self) -> dict[str, int]:
+        """Available category names and IDs, suitable for ``category = categories[name]``."""
+        return dict(self._category_values())
+
+    @property
+    def statuses(self) -> dict[str, int]:
+        """Available status names and IDs, suitable for ``status = statuses[name]``."""
+        return dict(self._status_values())
 
     @property
     def comments(self):

@@ -227,8 +227,8 @@ class ConfigurationTests(unittest.TestCase):
             from labmate.acquisition import LifecycleHooks
         except ImportError:
             self.skipTest("Requires Labmate")
-        if not hasattr(LifecycleHooks, "add_analysis_figure_saved"):
-            self.skipTest("Requires Labmate with analysis_figure_saved")
+        if not hasattr(LifecycleHooks, "add_figure_saved"):
+            self.skipTest("Requires Labmate with figure_saved(AnalysisData)")
         expected = self.credentials(self.project / "settings" / "server.conf")
         self.pointer(self.project, "settings/server.conf")
         with (

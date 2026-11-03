@@ -130,6 +130,8 @@ class AsyncBridge:
         self._client = None
         self._bridge = None
         self._experiments: Dict[Union[str, int], Any] = {}
+        self._experiment_states: Dict[Union[str, int], Dict[str, Any]] = {}
+        self._experiment_state_lock = threading.Lock()
         self._experiment_handles: Dict[Union[str, int], AsyncExperiment] = {}
         self._analysis_sources: Dict[str, RemoteSource] = {}
         self._analysis_handles: Dict[str, AsyncExperiment] = {}
@@ -156,19 +158,19 @@ class AsyncBridge:
         if self._attached:
             raise RuntimeError("This bridge is already attached")
         hooks = getattr(manager_or_hooks, "hooks", manager_or_hooks)
-        methods = ("add_acquisition_saved", "add_analysis_figure_saved")
+        methods = ("add_acquisition_saved", "add_figure_saved")
         if not all(callable(getattr(hooks, method, None)) for method in methods):
             raise TypeError(
-                "Labmate LifecycleHooks with analysis_figure_saved are required"
+                "Labmate LifecycleHooks with figure_saved(AnalysisData) are required"
             )
         hooks.add_acquisition_saved(self._on_acquisition_saved)
-        hooks.add_analysis_figure_saved(self._on_analysis_figure_saved)
+        hooks.add_figure_saved(self._on_figure_saved)
         self._attached = True
 
     def _on_acquisition_saved(self, acquisition: Any, **kwargs: Any) -> None:
         self.enqueue(acquisition, label="acquisition")
 
-    def _on_analysis_figure_saved(self, analysis: Any, **kwargs: Any) -> None:
+    def _on_figure_saved(self, analysis: Any, **kwargs: Any) -> None:
         self.enqueue(analysis, label="analysis + figure")
 
     def _title_for(self, data: Any) -> str:
@@ -404,9 +406,9 @@ class AsyncBridge:
             "title": title,
         }
 
-    def add_step(self, text: str) -> Future:
+    def add_step(self, text: str, *, checked: bool = False) -> Future:
         """Queue a step after successful completion of the latest snapshot."""
-        return self.experiment.add_step(text)
+        return self.experiment.add_step(text, checked=checked)
 
     def _submit_experiment_edit(
         self,
