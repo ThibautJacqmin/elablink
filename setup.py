@@ -7,7 +7,7 @@ README = (BASE_DIR / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="elablink",
-    version="0.1.0",
+    version="0.1.1",
     description="Python helpers for eLabFTW and asynchronous Labmate acquisition uploads",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -22,7 +22,7 @@ setup(
     packages=find_packages(include=("elablink", "elablink.*")),
     python_requires=">=3.10",
     install_requires=[
-        "elabapi-python",
+        "elabapi-python>=6.0.1,<7",
         "urllib3",
         "tomli; python_version < '3.11'",
     ],

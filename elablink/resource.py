@@ -23,7 +23,7 @@ class Resource(Experiment):
         return self._cache
 
     def _sync(self, updates: dict):
-        self.api.items.patch_item(self.ID, body=updates)
+        self.api.items.patch_item(id=self.ID, body=updates)
         self._load()
 
     def _category_values(self) -> dict[str, int]:

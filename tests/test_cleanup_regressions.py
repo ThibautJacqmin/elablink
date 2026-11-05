@@ -63,7 +63,7 @@ class ClientCreationTests(unittest.TestCase):
                     body={"template": 7}
                 )
                 self.client.experiments.patch_experiment.assert_called_once_with(
-                    17, body={"title": "Measurement"}
+                    id=17, body={"title": "Measurement"}
                 )
 
     def test_template_category_accepts_positional_keyword_name_or_id(self):
@@ -81,7 +81,7 @@ class ClientCreationTests(unittest.TestCase):
                 self.client.experiments.reset_mock()
                 self.client.create_experiment_from_template(*args, **kwargs)
                 self.client.experiments.patch_experiment.assert_called_once_with(
-                    17, body={"title": "Measurement", "category": 3}
+                    id=17, body={"title": "Measurement", "category": 3}
                 )
 
     def test_plain_creation_keeps_positional_and_keyword_categories(self):
@@ -99,7 +99,7 @@ class ClientCreationTests(unittest.TestCase):
                     body={"title": "Measurement"}
                 )
                 self.client.experiments.patch_experiment.assert_called_once_with(
-                    17, body={"category": 3}
+                    id=17, body={"category": 3}
                 )
 
     def test_duplicate_title_is_rejected_before_creating_an_experiment(self):

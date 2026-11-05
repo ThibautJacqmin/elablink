@@ -71,8 +71,8 @@ class ChoiceValidationTests(unittest.TestCase):
         resource.status = "9"
         self.assertEqual(
             client.items.patch_item.call_args_list,
-            [unittest.mock.call(17, body={"category": 8}),
-             unittest.mock.call(17, body={"status": 9})],
+            [unittest.mock.call(id=17, body={"category": 8}),
+             unittest.mock.call(id=17, body={"status": 9})],
         )
 
     def test_tag_catalog_is_fresh_and_separate_from_attached_tags(self):

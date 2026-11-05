@@ -171,9 +171,9 @@ class StepTests(unittest.TestCase):
         entity.category = entity.categories["Calibration"]
         entity.status = entity.statuses["Completed"]
         self.assertEqual(api.experiments.patch_experiment.call_args_list[0].kwargs,
-                         {"body": {"category": 3}})
+                         {"id": 17, "body": {"category": 3}})
         self.assertEqual(api.experiments.patch_experiment.call_args_list[1].kwargs,
-                         {"body": {"status": 7}})
+                         {"id": 17, "body": {"status": 7}})
 
     def test_step_future_failure_does_not_claim_checkbox_changed(self):
         future = Future()

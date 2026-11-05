@@ -56,10 +56,10 @@ class Client:
         self.uploads = ep.UploadsApi(self.api_client)
         self.steps = ep.StepsApi(self.api_client)
         self.comments = ep.CommentsApi(self.api_client)
-        self.categories = ep.ExperimentsCategoriesApi(self.api_client)
-        self.resource_categories = ep.ItemsTypesApi(self.api_client)
-        self.statuses = ep.ExperimentsStatusApi(self.api_client)
-        self.resource_statuses = ep.ResourcesStatusApi(self.api_client)
+        self.categories = ep.ExperimentCategoriesApi(self.api_client)
+        self.resource_categories = ep.ItemsTypesResourcesTemplatesApi(self.api_client)
+        self.statuses = ep.ExperimentStatusApi(self.api_client)
+        self.resource_statuses = ep.ResourceStatusApi(self.api_client)
         self.templates = ep.ExperimentsTemplatesApi(self.api_client)
         self.tags = ep.TagsApi(self.api_client)
         self.team_tags = ep.TeamTagsApi(self.api_client)
@@ -365,8 +365,7 @@ class Client:
         # Configures the API
         self.configuration = ep.Configuration()
         self.configuration.host = self.config["API_HOST_URL"]
-        self.configuration.api_key["api_key"] = self.config["API_KEY"]
-        self.configuration.api_key_prefix["api_key"] = "Authorization"
+        self.configuration.api_key["Authorization"] = self.config["API_KEY"]
         self.configuration.verify_ssl = self.config["VERIFY_SSL"].lower() == "true"
         host = urlsplit(self.configuration.host)
         if not self.configuration.verify_ssl and host.scheme == "https" and host.hostname:
@@ -384,7 +383,7 @@ class Client:
         self.api_client = ep.ApiClient(self.configuration)
         self.api_client.set_default_header(
             header_name="Authorization",
-            header_value=self.configuration.api_key["api_key"],
+            header_value=self.configuration.api_key["Authorization"],
         )
         self.enforce_unique_titles = (
             self.config["UNIQUE_EXPERIMENTS_TITLES"].lower() == "true"
