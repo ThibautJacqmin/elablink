@@ -5,7 +5,7 @@ from pathlib import Path
 project = "eLabLink"
 author = "Thibaut Jacqmin"
 copyright = "2026, Thibaut Jacqmin"
-release = "0.1.0"
+release = "0.1.1"
 
 extensions = ["sphinx.ext.autodoc", "sphinx.ext.napoleon", "sphinx_rtd_theme"]
 autodoc_mock_imports = ["labmate"]

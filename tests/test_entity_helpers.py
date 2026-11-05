@@ -55,7 +55,7 @@ class EntityHelperTests(unittest.TestCase):
         data["metadata"] = json.dumps({"elabftw": {"display_main_text": True}})
         entity.started_on = date(2020, 4, 3)
         api.experiments.patch_experiment.assert_called_with(
-            17, body={"date": "2020-04-03"}
+            id=17, body={"date": "2020-04-03"}
         )
         entity.set_extra_fields({"Author": "Ada"})
         metadata = json.loads(

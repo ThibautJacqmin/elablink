@@ -1,6 +1,15 @@
 eLabLink release notes
 =====================
 
+0.1.1
+-----
+
+* Fix compatibility with elabapi-python 6.x, including renamed API classes and
+  the argument order used to update experiments and resources.
+* Align API-key authentication with the generated client's Authorization settings.
+* Require ``elabapi-python>=6.0.1,<7`` and add regression tests exercising the
+  installed SDK's request handling.
+
 0.1.0
 -----
 

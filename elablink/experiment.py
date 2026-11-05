@@ -95,7 +95,7 @@ class Experiment:
 
     def _sync(self, updates: dict):
         """Patch experiment attributes on the server and refresh cache."""
-        self.api.experiments.patch_experiment(self.ID, body=updates)
+        self.api.experiments.patch_experiment(id=self.ID, body=updates)
         self._load()
 
     def _category_values(self) -> dict[str, int]:

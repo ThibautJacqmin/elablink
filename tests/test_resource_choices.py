@@ -33,7 +33,7 @@ class ResourceChoiceTests(unittest.TestCase):
             patch("elablink.client.resolve_config_path", return_value=Path("unused.conf")),
             patch.object(Client, "_read_configuration_file", return_value={}),
             patch.object(Client, "_api_configuration", new=configure),
-            patch("elablink.client.ep.ItemsTypesApi") as category_api,
+            patch("elablink.client.ep.ItemsTypesResourcesTemplatesApi") as category_api,
         ):
             client = Client()
 
@@ -67,7 +67,7 @@ class ResourceChoiceTests(unittest.TestCase):
                 resource = Resource(api=client, title="Resource without categories")
                 client.items.post_item_with_http_info.assert_called_once_with(body={})
                 client.items.patch_item.assert_called_once_with(
-                    17, body={"title": "Resource without categories"}
+                    id=17, body={"title": "Resource without categories"}
                 )
                 self.assertEqual(resource.categories, {})
                 self.assertEqual(resource.statuses, {})
@@ -87,13 +87,13 @@ class ResourceChoiceTests(unittest.TestCase):
         client = self.client()
         resource = Resource(client, 17)
         resource.category = "optical TABLES"
-        client.items.patch_item.assert_called_once_with(17, body={"category": 7})
+        client.items.patch_item.assert_called_once_with(id=17, body={"category": 7})
 
     def test_numeric_category_assignment_validates_against_current_choices(self):
         client = self.client()
         resource = Resource(client, 17)
         resource.category = 3
-        client.items.patch_item.assert_called_once_with(17, body={"category": 3})
+        client.items.patch_item.assert_called_once_with(id=17, body={"category": 3})
         client.resource_categories.read_items_types.assert_called_once_with()
 
     def test_unknown_numeric_category_does_not_modify_resource(self):
@@ -121,7 +121,7 @@ class ResourceChoiceTests(unittest.TestCase):
             body={"category_id": 3}
         )
         client.items.patch_item.assert_called_once_with(
-            17, body={"title": "Blue laser", "category": 3}
+            id=17, body={"title": "Blue laser", "category": 3}
         )
 
     def test_create_resource_validates_numeric_selection(self):
@@ -133,7 +133,7 @@ class ResourceChoiceTests(unittest.TestCase):
                     body={"category_id": 3}
                 )
                 client.items.patch_item.assert_called_once_with(
-                    17, body={"title": "Blue laser", "category": 3}
+                    id=17, body={"title": "Blue laser", "category": 3}
                 )
                 client.resource_categories.read_items_types.assert_called_once_with()
 
@@ -150,7 +150,7 @@ class ResourceChoiceTests(unittest.TestCase):
         client = self.client()
         client.create_resource("Blue laser")
         client.items.post_item_with_http_info.assert_called_once_with(body={})
-        client.items.patch_item.assert_called_once_with(17, body={"title": "Blue laser"})
+        client.items.patch_item.assert_called_once_with(id=17, body={"title": "Blue laser"})
         client.resource_categories.read_items_types.assert_not_called()
 
     def test_unknown_name_is_rejected_before_resource_creation(self):
