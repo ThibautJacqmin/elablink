@@ -6,9 +6,9 @@ and resources and managing their files. It is **experimental** in eLabLink
 0.2.0a1 and has less testing than the core Python API. The browser has been
 exercised on Windows against a live eLabFTW server and with offline
 experiment and resource records on Ubuntu 24.04 under WSLg, using both
-Wayland and X11. macOS 14 package dependencies were checked for Python 3.12
-on both Apple Silicon and Intel. Launching the application and using Finder
-on a Mac still need native testing.
+Wayland and X11. The installed launcher and single-click navigation were
+also tested on a macOS runner using native Qt windows. The Finder launcher
+below still needs a manual check on a Mac.
 
 .. contents:: On this page
    :local:
@@ -302,7 +302,9 @@ If installation or launch fails
 
   .. code-block:: sh
 
-     sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1
+     sudo apt install libegl1 libgl1 libx11-xcb1 libxkbcommon-x11-0 \
+       libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-randr0 \
+       libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0
 
   On other distributions use the equivalent runtime packages. See
   `Qt's X11 requirements <https://doc.qt.io/qt-6/linux-requirements.html>`_.
