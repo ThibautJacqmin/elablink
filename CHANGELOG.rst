@@ -1,8 +1,8 @@
 eLabLink release notes
 =====================
 
-Unreleased
-----------
+0.2.0 (2026-11-25)
+------------------
 
 * Transfer experiments and resources to an existing eLabFTW user and verify the
   new owner and team. Experiment creation, including creation from templates,
@@ -14,10 +14,13 @@ Unreleased
   server and report conflicting edits.
 * Remember the original experiment for an H5 acquisition opened from another
   analysis project. New uploads write a portable association beside the H5 file.
-  Older files can use the original data directory's index.
+  Older files can use the original data directory's index. A captured checkpoint
+  can finish uploading when Labmate replaces the original local H5 file.
 * Configure background file upload timeouts independently of other API requests.
   Protect acquisition snapshots against linked files and keep sensitive HTTP
-  response details out of background error reports.
+  response details out of background error reports. On macOS, acquisitions can
+  use the standard ``/tmp`` and ``/var`` directories while checks still reject
+  linked acquisition files and directories.
 * Stream attachment downloads to a temporary file and replace the destination
   only when the transfer completes.
 * Accept both naming conventions for category and status APIs in supported

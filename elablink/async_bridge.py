@@ -15,6 +15,7 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from ._paths import absolute_storage_path
 from .async_experiment import AsyncExperiment
 from .bridge import Bridge
 from .client import Client
@@ -299,7 +300,7 @@ class AsyncBridge:
     def enqueue(self, data: Any, *, label: str = "snapshot") -> Future:
         """Capture a saved acquisition or analysis locally and queue its upload."""
         self._check_open()
-        original = Path(str(data.filepath)).expanduser().absolute()
+        original = absolute_storage_path(str(data.filepath))
         h5_path = original if str(original).endswith(".h5") else Path(str(original) + ".h5")
         _check_source_path(h5_path)
         prefix = h5_path.resolve()
@@ -423,9 +424,8 @@ class AsyncBridge:
         )
         result = self._experiment_info(experiment, snapshot.experiment_name)
         if original is not None:
-            # The stable checkpoint can still upload if the original was removed.
-            if original.is_file():
-                write_source_manifest(original, source)
+            # Labmate can replace the local H5 after the checkpoint has uploaded.
+            write_source_manifest(original, source, missing_ok=True)
             remember_source(original, source, self._analysis_directory)
         self._remove_snapshot(directory)
         return result

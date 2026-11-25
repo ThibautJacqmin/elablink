@@ -138,10 +138,12 @@ def check_source_manifest(filepath: Path, source: RemoteSource) -> None:
             )
 
 
-def write_source_manifest(filepath: Path, source: RemoteSource) -> Path:
-    """Write portable routing beside one H5 file, without credentials or data edits."""
+def write_source_manifest(filepath: Path, source: RemoteSource, *, missing_ok: bool = False) -> Path | None:
+    """Write portable routing beside an H5 file. Optionally skip a missing original."""
     filepath = _local_file(filepath)
     if not filepath.is_file():
+        if missing_ok:
+            return None
         raise FileNotFoundError(filepath)
     manifest = _file_manifest(filepath)
     with _CATALOG_LOCK:

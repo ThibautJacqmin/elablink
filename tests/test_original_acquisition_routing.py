@@ -140,6 +140,27 @@ class OriginalSourceTests(unittest.TestCase):
         self.assertEqual(read_source(self.original, self.analysis_catalog), self.source)
         self.assertEqual(list(bridge.spool_directory.iterdir()), [])
 
+    def test_original_removed_during_sidecar_write_keeps_the_checkpoint_successful(self):
+        client = OfflineClient()
+        bridge = self.bridge(lambda: client)
+
+        def remove_before_write(filepath, source, **kwargs):
+            filepath.unlink()
+            return write_source_manifest(filepath, source, **kwargs)
+
+        with patch("elablink.async_bridge.write_source_manifest", side_effect=remove_before_write):
+            bridge.enqueue(SimpleNamespace(filepath=self.original))
+            bridge.add_step("Uploaded")
+            self.assertEqual(bridge.flush(timeout=5)["id"], 1)
+
+        self.assertEqual(client.experiment.files, {"run.h5": b"saved measurement"})
+        self.assertEqual(client.experiment.steps, ["Uploaded"])
+        self.assertFalse(self.original.with_suffix(".h5.elablink.json").exists())
+        self.assertEqual(read_source(self.original, self.analysis_catalog), self.source)
+        self.assertEqual(list(bridge.spool_directory.iterdir()), [])
+        with self.assertRaises(FileNotFoundError):
+            write_source_manifest(self.original, self.source)
+
     def test_metadata_write_failure_is_reported_and_snapshot_is_retained(self):
         client = OfflineClient()
         bridge = self.bridge(lambda: client)
