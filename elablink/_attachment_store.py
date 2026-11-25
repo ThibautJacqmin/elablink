@@ -10,13 +10,12 @@ import hashlib
 import os
 from pathlib import Path
 import re
-import stat
 import tempfile
 import threading
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode
 
-from ._paths import absolute_storage_path
+from ._paths import absolute_storage_path, checked_working_folder, is_junction
 from .client import Client
 from .config import browser_storage_directory
 from .remote_analysis import RemoteSource, check_source_manifest, read_source, write_source_manifest
@@ -26,18 +25,6 @@ _CHUNK_SIZE = 1024 * 1024
 _REQUEST_TIMEOUT = (5, 30)
 _UPLOAD_TIMEOUT = (300, 300)
 _RESERVED_NAME = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$", re.I)
-
-
-def _junction(path):
-    check = getattr(path, "is_junction", None)
-    if check is not None:
-        return check()
-    # Path.is_junction was added in Python 3.12.
-    try:
-        information = path.lstat()
-    except FileNotFoundError:
-        return False
-    return getattr(information, "st_reparse_tag", 0) == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
 
 
 def _filename(value: Any) -> str:
@@ -114,13 +101,7 @@ class AttachmentStore:
             return self.folder_info()
         if not str(folder).strip():
             raise ValueError("Choose a non-empty working folder path")
-        path = absolute_storage_path(folder)
-        for part in (path, *path.parents):
-            if part.is_symlink() or _junction(part):
-                raise ValueError("The working folder cannot contain symbolic links or junctions")
-        path = path.resolve()
-        if path.exists() and not path.is_dir():
-            raise NotADirectoryError(path)
+        path = checked_working_folder(folder)
         if path.is_relative_to(self.cache_directory) or self.cache_directory.is_relative_to(path):
             raise ValueError("Choose a working folder outside the browser's temporary cache")
         self.folder = path
@@ -309,7 +290,7 @@ class AttachmentStore:
 
     @staticmethod
     def _check_cache_path(path, directory):
-        junction = _junction(path)
+        junction = is_junction(path)
         if path.is_symlink() or junction or not path.resolve().is_relative_to(directory):
             raise ValueError("The attachment cache contains a symbolic link or an unsafe path")
 

@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 
-from ._paths import absolute_storage_path
+from ._paths import checked_working_folder
 
 try:
     import tomllib
@@ -102,10 +102,7 @@ def resolve_browser_folder(folder: str | Path | None = None) -> Path | None:
     if folder is not None:
         if not str(folder).strip():
             raise ValueError("Choose a non-empty browser folder path")
-        path = absolute_storage_path(folder)
-        if path.exists() and not path.is_dir():
-            raise NotADirectoryError(path)
-        return path
+        return checked_working_folder(folder)
     current = Path.cwd().resolve()
     for directory in (current, *current.parents, _PROJECT_ROOT):
         settings = _project_settings(directory)

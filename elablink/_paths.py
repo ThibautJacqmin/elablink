@@ -20,3 +20,27 @@ def absolute_storage_path(value: str | Path) -> Path:
     except FileNotFoundError:
         pass
     return path
+
+
+def is_junction(path: Path) -> bool:
+    check = getattr(path, "is_junction", None)
+    if check is not None:
+        return check()
+    # Path.is_junction was added in Python 3.12.
+    try:
+        information = path.lstat()
+    except FileNotFoundError:
+        return False
+    return getattr(information, "st_reparse_tag", 0) == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
+
+
+def checked_working_folder(value: str | Path) -> Path:
+    """Check every component before returning the canonical working directory."""
+    path = absolute_storage_path(value)
+    for part in (path, *path.parents):
+        if part.is_symlink() or is_junction(part):
+            raise ValueError("The working folder cannot contain symbolic links or junctions")
+    path = path.resolve()
+    if path.exists() and not path.is_dir():
+        raise NotADirectoryError(path)
+    return path
