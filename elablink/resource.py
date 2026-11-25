@@ -13,15 +13,6 @@ class Resource(Experiment):
 
     entity_type = "items"
 
-    def _load(self):
-        if self.ID is None:
-            from .exceptions import DeletedExperiment
-
-            raise DeletedExperiment()
-        item = self.api.items.get_item(self.ID)
-        self._cache = item.to_dict()
-        return self._cache
-
     def _sync(self, updates: dict):
         self.api.items.patch_item(id=self.ID, body=updates)
         self._load()

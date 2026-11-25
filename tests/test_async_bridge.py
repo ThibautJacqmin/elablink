@@ -100,7 +100,7 @@ class AsyncBridgeTests(BridgeTestCase):
             factory.assert_not_called()
             adapter.enqueue(self.data())
             adapter.flush(timeout=3)
-            set_timeouts.assert_called_once_with(client, (5, 30))
+            set_timeouts.assert_called_once_with(client, (5, 30), (300, 300))
         self.assertEqual(len(threads), 1)
         self.assertNotEqual(threads[0], caller)
 

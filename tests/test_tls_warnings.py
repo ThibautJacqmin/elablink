@@ -11,12 +11,13 @@ from elablink import Client
 
 
 class TLSWarningTests(unittest.TestCase):
-    def configure(self, *, verify_ssl=False, url="https://lab.example/api/v2"):
+    def configure(self, *, verify_ssl=False, url="https://lab.example/api/v2", allow_http="false"):
         client = Client.__new__(Client)
         client.config = {
             "API_HOST_URL": url,
             "API_KEY": "offline-test-key",
             "VERIFY_SSL": str(verify_ssl),
+            "ALLOW_INSECURE_HTTP": allow_http,
             "UNIQUE_EXPERIMENTS_TITLES": "true",
         }
         client._api_configuration()
@@ -69,5 +70,5 @@ class TLSWarningTests(unittest.TestCase):
     def test_http_configuration_does_not_install_tls_filters(self):
         with warnings.catch_warnings():
             previous = warnings.filters[:]
-            self.configure(url="http://lab.example/api/v2")
+            self.configure(url="http://lab.example/api/v2", allow_http="true")
             self.assertEqual(warnings.filters, previous)

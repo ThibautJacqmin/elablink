@@ -19,12 +19,15 @@ from .async_experiment import AsyncExperiment
 from .bridge import Bridge
 from .client import Client
 from .config import resolve_config_path
+from .exceptions import safe_error_message
 from .remote_analysis import (
     RemoteSource,
+    check_source_manifest,
     download_analysis,
     read_source,
     remember_source,
     validate_request,
+    write_source_manifest,
 )
 
 
@@ -54,14 +57,24 @@ def _future_error(future: Future) -> Optional[BaseException]:
     return future.exception() if future.done() else None
 
 
-def _set_request_timeouts(client: Any, timeout: Tuple[float, float]) -> None:
+def _check_source_path(path: Path) -> None:
+    """Do not follow links while capturing files from an acquisition folder."""
+    for entry in (path, *path.parents):
+        if entry.is_symlink() or getattr(entry, "is_junction", lambda: False)():
+            raise ValueError("Acquisition attachments must not use symbolic links or junctions.")
+
+
+def _set_request_timeouts(
+    client: Any, timeout: Tuple[float, float], upload_timeout: Tuple[float, float] = (300, 300)
+) -> None:
     """Set defaults on this client only, preserving explicit request overrides."""
     original = client.api_client.call_api
 
     @wraps(original)
     def call_api(*args, **kwargs):
         if kwargs.get("_request_timeout") is None:
-            kwargs["_request_timeout"] = timeout
+            # urllib3 uses the connection timeout while sending the body too.
+            kwargs["_request_timeout"] = upload_timeout if kwargs.get("files") else timeout
         return original(*args, **kwargs)
 
     client.api_client.call_api = call_api
@@ -79,6 +92,7 @@ class AsyncBridge:
         spool_directory: Local directory used for stable copies of files to upload.
         experiment_id: Existing experiment ID to use instead of resolving the title.
         request_timeout: Default HTTP connection and read timeouts, in seconds.
+        upload_timeout: HTTP connection/send and read timeouts for multipart uploads.
         client_factory: Optional factory for a compatible client, called on the worker.
             Custom factories are responsible for their own transport timeouts.
         analysis_directory: Local origin index and downloaded-file directory.
@@ -101,6 +115,7 @@ class AsyncBridge:
         spool_directory: Union[str, Path] = "data/.upload_queue",
         experiment_id: Optional[int] = None,
         request_timeout: Tuple[float, float] = (5, 30),
+        upload_timeout: Tuple[float, float] = (300, 300),
         client_factory: Optional[Callable[[], Any]] = None,
         analysis_directory: Optional[Union[str, Path]] = None,
     ) -> None:
@@ -108,6 +123,8 @@ class AsyncBridge:
             raise ValueError("An experiment title is required")
         if len(request_timeout) != 2 or any(value <= 0 for value in request_timeout):
             raise ValueError("HTTP connection and read timeouts must be positive")
+        if len(upload_timeout) != 2 or any(value <= 0 for value in upload_timeout):
+            raise ValueError("Upload connection/send and read timeouts must be positive")
         self.title = title
         if client_factory is None:
             self.config_path = resolve_config_path(config_path)
@@ -126,6 +143,7 @@ class AsyncBridge:
         self.spool_directory.mkdir(parents=True, exist_ok=True)
         self.experiment_id = experiment_id
         self._request_timeout = request_timeout
+        self._upload_timeout = upload_timeout
         self._client_factory = client_factory
         self._client = None
         self._bridge = None
@@ -281,19 +299,21 @@ class AsyncBridge:
     def enqueue(self, data: Any, *, label: str = "snapshot") -> Future:
         """Capture a saved acquisition or analysis locally and queue its upload."""
         self._check_open()
-        prefix = Path(str(data.filepath)).resolve()
-        if str(prefix).endswith(".h5"):
-            prefix = Path(str(prefix)[:-3])
-        h5_path = Path(str(prefix) + ".h5")
+        original = Path(str(data.filepath)).expanduser().absolute()
+        h5_path = original if str(original).endswith(".h5") else Path(str(original) + ".h5")
+        _check_source_path(h5_path)
+        prefix = h5_path.resolve()
+        prefix = Path(str(prefix)[:-3])
         if not h5_path.is_file():
             raise FileNotFoundError(h5_path)
+        self.bind_analysis(h5_path)
         title = self._title_for(data)
         remote_source = self._analysis_sources.get(str(prefix))
         directory = Path(mkdtemp(prefix="snapshot-", dir=self.spool_directory))
         try:
             files = [path for path in prefix.parent.iterdir() if path.is_file()]
             stems = [path.name[:-3] for path in files if path.name.endswith(".h5")]
-            attachments = []
+            sources = []
             for source in sorted(files):
                 owners = [
                     stem
@@ -303,9 +323,13 @@ class AsyncBridge:
                     or source.name.startswith(stem + ".h5_")
                 ]
                 if owners and max(owners, key=len) == prefix.name:
-                    target = directory / source.name
-                    shutil.copy2(source, target)
-                    attachments.append(target)
+                    _check_source_path(source)
+                    sources.append(source)
+            attachments = []
+            for source in sources:
+                target = directory / source.name
+                shutil.copy2(source, target)
+                attachments.append(target)
             snapshot = _Snapshot(
                 str(directory / prefix.name),
                 title,
@@ -337,7 +361,7 @@ class AsyncBridge:
         if self._client is None:
             if self._client_factory is None:
                 self._client = Client(str(self.config_path))
-                _set_request_timeouts(self._client, self._request_timeout)
+                _set_request_timeouts(self._client, self._request_timeout, self._upload_timeout)
             else:
                 self._client = self._client_factory()
         if self._bridge is None:
@@ -368,21 +392,41 @@ class AsyncBridge:
     def _upload(
         self, snapshot: _Snapshot, attachments: Tuple[Path, ...], directory: Path
     ):
+        original = Path(snapshot.original_filepath) if snapshot.original_filepath is not None else None
+        self._ensure_client()
+        known = read_source(original, self._analysis_directory) if original is not None else None
+        server = self._client.configuration.host.rstrip("/")
+        requested_id = snapshot.experiment_id if snapshot.experiment_id is not None else self.experiment_id
+        if known is not None:
+            if known.server.rstrip("/") != server:
+                raise ValueError("The local file belongs to a different eLabFTW server")
+            if requested_id is None:
+                # An earlier queued save can legitimately have recorded this
+                # association. Never create a new record by title to check it.
+                previous = self._experiments.get(snapshot.experiment_name)
+                if previous is None:
+                    raise ValueError(
+                        "The local file's origin changed after capture. "
+                        "Check its eLabFTW association before queuing a new save."
+                    )
+                requested_id = previous.ID
+            if known.experiment_id != requested_id:
+                raise ValueError("The local file belongs to a different eLabFTW experiment")
         experiment = self._ensure_remote(snapshot)
+        source = RemoteSource(experiment.ID, snapshot.experiment_name, server)
+        if original is not None:
+            if known is not None and known.experiment_id != experiment.ID:
+                raise ValueError("The local file belongs to a different eLabFTW experiment")
+            check_source_manifest(original, source)
         self._bridge.save_experiment(
             snapshot, attachments=attachments, experiment=experiment
         )
         result = self._experiment_info(experiment, snapshot.experiment_name)
-        if snapshot.original_filepath is not None:
-            remember_source(
-                Path(snapshot.original_filepath),
-                RemoteSource(
-                    experiment.ID,
-                    snapshot.experiment_name,
-                    self._client.configuration.host.rstrip("/"),
-                ),
-                self._analysis_directory,
-            )
+        if original is not None:
+            # The stable checkpoint can still upload if the original was removed.
+            if original.is_file():
+                write_source_manifest(original, source)
+            remember_source(original, source, self._analysis_directory)
         self._remove_snapshot(directory)
         return result
 
@@ -440,7 +484,7 @@ class AsyncBridge:
                 {
                     "job": job.label,
                     "state": state,
-                    "error": str(error) if error else None,
+                    "error": safe_error_message(error) if error else None,
                 }
             )
         return rows
@@ -449,7 +493,7 @@ class AsyncBridge:
         """Wait for submitted jobs and return the last job's experiment information.
 
         A timeout leaves jobs running; it does not cancel HTTP requests. Job
-        failures raise RuntimeError chained from the original error. Failed upload
+        failures raise a RuntimeError with a safe summary. Failed upload
         snapshots are retained; queued experiment edits are not persisted or retried.
         """
         self._check_owner()
@@ -466,11 +510,16 @@ class AsyncBridge:
             error for job in jobs if (error := _future_error(job.future)) is not None
         ]
         if failures:
+            cause = failures[0]
+            message = safe_error_message(cause)
+            if (message != str(cause) or cause.__cause__ is not None or cause.__context__ is not None
+                    or hasattr(cause, "status") or (hasattr(cause, "headers") and hasattr(cause, "body"))):
+                cause = None
             raise RuntimeError(
                 f"{len(failures)} eLabFTW jobs failed; "
-                f"{failures[0]}. "
+                f"{message} "
                 f"Any failed upload snapshots remain in {self.spool_directory}"
-            ) from failures[0]
+            ) from cause
         return jobs[-1].future.result() if jobs else {}
 
     def close(self, timeout: Optional[float] = 120) -> None:
@@ -492,8 +541,9 @@ class AsyncBridge:
         else:
             try:
                 self.close()
-            except Exception:
-                logger.exception(
-                    "Background uploads also failed while leaving the context"
+            except Exception as error:
+                logger.error(
+                    "Background uploads also failed while leaving the context: %s",
+                    safe_error_message(error),
                 )
         return False

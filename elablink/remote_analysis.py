@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,6 +95,82 @@ def _read_json(path: Path) -> dict[str, Any]:
     ):
         raise ValueError(f"Unsupported eLabLink source metadata in {path}")
     return data
+
+
+def _file_manifest(filepath: Path) -> Path:
+    return filepath.with_name(filepath.name + ".elablink.json")
+
+
+def _manifest_source(manifest: Path, filepath: Path) -> RemoteSource:
+    if manifest.is_symlink() or getattr(manifest, "is_junction", lambda: False)():
+        raise ValueError("eLabLink source metadata must not use symbolic links or junctions")
+    if not manifest.is_file():
+        raise ValueError(f"The eLabLink source metadata is not a file: {manifest}")
+    data = _read_json(manifest)
+    if data.get("filename") != filepath.name:
+        raise ValueError(f"The eLabLink source filename does not match {filepath.name!r}")
+    return _record_source(data)
+
+
+def check_source_manifest(filepath: Path, source: RemoteSource) -> None:
+    """Refuse to replace a different or malformed local experiment association."""
+    filepath = _local_file(filepath)
+    _source_record(source, filepath.name)
+    with _CATALOG_LOCK:
+        manifest = _file_manifest(filepath)
+        existing = None
+        if manifest.exists() or manifest.is_symlink():
+            existing = _manifest_source(manifest, filepath)
+        else:
+            legacy = filepath.parent / _MANIFEST
+            if legacy.exists() or legacy.is_symlink():
+                data = _read_json(legacy)
+                # A legacy folder manifest may describe another file in this folder.
+                if data.get("filename") == filepath.name:
+                    existing = _manifest_source(legacy, filepath)
+        if existing is not None and (
+            existing.experiment_id != source.experiment_id
+            or existing.server.rstrip("/") != source.server.rstrip("/")
+        ):
+            raise ValueError(
+                "This local file belongs to a different eLabFTW experiment or server. "
+                "Choose another destination filename."
+            )
+
+
+def write_source_manifest(filepath: Path, source: RemoteSource) -> Path:
+    """Write portable routing beside one H5 file, without credentials or data edits."""
+    filepath = _local_file(filepath)
+    if not filepath.is_file():
+        raise FileNotFoundError(filepath)
+    manifest = _file_manifest(filepath)
+    with _CATALOG_LOCK:
+        check_source_manifest(filepath, source)
+        temporary = None
+        try:
+            with NamedTemporaryFile(
+                mode="w", encoding="utf-8", prefix=".elablink-source-", suffix=".tmp",
+                dir=filepath.parent, delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
+                json.dump({"version": 1, **_source_record(source, filepath.name)}, stream, indent=2)
+                stream.write("\n")
+            check_source_manifest(filepath, source)
+            if manifest.exists():
+                temporary.replace(manifest)
+            else:
+                try:
+                    if os.name == "nt":
+                        temporary.rename(manifest)
+                    else:
+                        os.link(temporary, manifest)
+                except FileExistsError:
+                    check_source_manifest(filepath, source)
+                    temporary.replace(manifest)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+    return manifest
 
 
 def _catalog_file(record: dict[str, Any], directory: Path) -> Path:
@@ -270,17 +347,28 @@ def download_analysis(
 def read_source(filepath: Path, directory: Path | None = None) -> RemoteSource | None:
     """Read local routing without contacting eLabFTW or changing the HDF5 file."""
     filepath = _local_file(filepath)
-    manifest = filepath.parent / _MANIFEST
-    if manifest.is_file():
-        data = _read_json(manifest)
-        if data.get("filename") != filepath.name:
-            raise ValueError(
-                f"The eLabLink source filename does not match {filepath.name!r}"
-            )
-        return _record_source(data)
-    if directory is not None:
-        directory = Path(directory).expanduser().resolve()
-        for record in reversed(_read_catalog(directory)):
-            if _catalog_file(record, directory) == filepath:
-                return _record_source(record)
-    return None
+    for manifest in (_file_manifest(filepath), filepath.parent / _MANIFEST):
+        if manifest.exists() or manifest.is_symlink():
+            return _manifest_source(manifest, filepath)
+    # Older acquisitions have only a catalog in their original data directory.
+    # Look up their exact path there, even when another project opens the file.
+    directories = [Path(directory)] if directory is not None else []
+    directories.extend(parent / ".elabftw" for parent in filepath.parents)
+    visited = set()
+    source = None
+    for candidate in directories:
+        candidate = candidate.expanduser().resolve()
+        if candidate in visited:
+            continue
+        visited.add(candidate)
+        for record in reversed(_read_catalog(candidate)):
+            if _catalog_file(record, candidate) != filepath:
+                continue
+            found = _record_source(record)
+            if source is not None and (
+                source.experiment_id != found.experiment_id
+                or source.server.rstrip("/") != found.server.rstrip("/")
+            ):
+                raise ValueError("Conflicting eLabFTW origins for this local file; keep one verified association")
+            source = source or found
+    return source

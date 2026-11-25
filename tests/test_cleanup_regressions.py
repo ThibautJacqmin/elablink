@@ -206,6 +206,7 @@ class MetadataValidationTests(unittest.TestCase):
     def test_extra_fields_reject_bad_metadata_without_overwriting_it(self):
         entity, api = self.entity()
         entity._cache["metadata"] = "[]"
+        api.experiments.get_experiment.return_value.to_dict.return_value = {"metadata": "[]"}
         with self.assertRaises(ValueError):
             entity.set_extra_fields({"Temperature": 4})
         api.experiments.patch_experiment.assert_not_called()

@@ -38,6 +38,9 @@ The existing local copy takes precedence over the server version. Local changes
 are preserved, and there is no automatic remote refresh or conflict resolution.
 The local association is server-specific, requires no remote custom field,
 and remains available when you reopen the file in another manager.
+New successful uploads also write a small ``.h5.elablink.json`` file beside the
+H5 file; keep it with the data when moving files. Older acquisitions can use
+their original data folder's index when opened from another analysis project.
 Keep one Python process responsible for a data directory: the local index is
 not a multi-process database.
 
@@ -84,9 +87,10 @@ Both wait calls default to 120 seconds; choose a longer timeout if needed:
 
    information = aqm.flush(timeout=300)
 
-The default HTTP connection/read timeout pair is ``(5, 30)`` seconds. Pass
-``request_timeout=(5, 60)`` to the manager to change it. A read timeout is not
-a guaranteed maximum total upload duration.
+HTTP requests default to ``request_timeout=(5, 30)`` seconds. File uploads use
+``upload_timeout=(300, 300)`` for connection/sending and reading; pass either
+option to the manager to change it. These socket timeouts do not limit the
+total upload duration. ``flush(timeout=...)`` only limits how long you wait.
 
 A wait timeout does not cancel an in-flight request. Check ``upload_status()``
 and call ``flush()`` or ``close()`` again later. After a close was requested, no

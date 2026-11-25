@@ -1,12 +1,13 @@
 """Exercise the installed generated SDK, mocking only its HTTP transport."""
 
+import json
 from pathlib import Path
 import tempfile
-from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from elablink import Client, Experiment, Resource
+from elablink import Client, Experiment, Resource, OwnershipTransferError
+from elabapi_python.rest import ApiException
 
 
 class SDKContractTests(unittest.TestCase):
@@ -26,6 +27,12 @@ class SDKContractTests(unittest.TestCase):
         transport = patch.object(self.client.api_client, "call_api")
         self.request = transport.start()
         self.addCleanup(transport.stop)
+
+    @staticmethod
+    def raw_record(payload):
+        response = Mock()
+        response.data = json.dumps(payload).encode()
+        return response
 
     def test_generated_sdk_authentication_sends_the_raw_authorization_key(self):
         headers = {}
@@ -49,7 +56,7 @@ class SDKContractTests(unittest.TestCase):
                                  (endpoint, "GET", parameters))
 
     def test_entity_edits_reach_sdk_patch_and_refresh_with_correct_body_and_id(self):
-        self.request.return_value = SimpleNamespace(to_dict=lambda: {"id": 17, "title": "Changed"})
+        self.request.return_value = self.raw_record({"id": 17, "title": "Changed"})
         for entity_type, endpoint in (
             (Experiment, "/experiments/{id}"), (Resource, "/items/{id}"),
         ):
@@ -70,6 +77,80 @@ class SDKContractTests(unittest.TestCase):
         self.request.assert_called_once()
         self.assertEqual(self.request.call_args.args[:2], ("/experiments", "POST"))
         self.assertEqual(self.request.call_args.kwargs["body"], {"title": "Measurement"})
+
+    def test_ownership_transfer_uses_generated_patch_then_reads_back(self):
+        for entity_type, endpoint in (
+            (Experiment, "/experiments/{id}"), (Resource, "/items/{id}"),
+        ):
+            with self.subTest(entity=entity_type.__name__):
+                self.request.reset_mock()
+                raw = self.raw_record({"id": 17, "userid": 9, "team": 4})
+                self.request.side_effect = [None, raw]
+                entity = entity_type(self.client, 17)
+                entity.transfer_ownership(9)
+                transfer, refresh = self.request.call_args_list
+                self.assertEqual(transfer.args[:3], (endpoint, "PATCH", {"id": 17}))
+                self.assertEqual(transfer.kwargs["body"],
+                                 {"action": "updateowner", "userid": 9, "team": 4})
+                self.assertEqual(refresh.args[:3], (endpoint, "GET", {"id": 17}))
+                self.assertFalse(refresh.kwargs["_preload_content"])
+                raw.close.assert_called_once_with()
+                raw.release_conn.assert_called_once_with()
+                self.assertEqual(entity.owner_id, 9)
+
+    def test_unverified_ownership_responses_do_not_confirm_a_transfer(self):
+        for record in (
+            [], {}, {"id": 17, "userid": 9}, {"userid": 9, "team": 4},
+            {"id": 18, "userid": 9, "team": 4}, {"id": 17, "userid": 8, "team": 4},
+            {"id": 17, "userid": 9, "team": 3}, {"id": 17, "userid": 9, "team": "4"},
+            {"id": 17, "userid": 9, "team": True},
+        ):
+            for entity_type in (Experiment, Resource):
+                with self.subTest(record=record, entity_type=entity_type.__name__):
+                    raw = self.raw_record(record)
+                    self.request.reset_mock()
+                    self.request.side_effect = [None, raw]
+                    entity = entity_type(self.client, 17)
+                    with self.assertRaises(OwnershipTransferError) as caught:
+                        entity.transfer_ownership(9)
+                    self.assertEqual(caught.exception.entity_id, 17)
+                    self.assertIsNone(entity._cache)
+                    self.assertEqual(self.request.call_count, 2)
+                    raw.close.assert_called_once_with()
+                    raw.release_conn.assert_called_once_with()
+
+    def test_unreadable_transfer_confirmation_preserves_id_and_releases_response(self):
+        raw = self.raw_record({})
+        raw.data = b"invalid JSON"
+        for confirmation in (ApiException(status=403), raw):
+            with self.subTest(confirmation=type(confirmation).__name__):
+                self.request.reset_mock()
+                self.request.side_effect = [None, confirmation]
+                entity = Experiment(self.client, 17)
+                with self.assertRaises(OwnershipTransferError) as caught:
+                    entity.transfer_ownership(9)
+                self.assertEqual(self.request.call_count, 2)
+                self.assertEqual(caught.exception.entity_id, 17)
+                self.assertIsNone(entity._cache)
+                if isinstance(confirmation, ApiException):
+                    self.assertIs(caught.exception.__cause__, confirmation)
+        raw.close.assert_called_once_with()
+        raw.release_conn.assert_called_once_with()
+
+    def test_creation_with_owner_posts_transfers_then_verifies(self):
+        self.request.side_effect = [
+            (None, None, {"Location": "/api/v2/experiments/17"}),
+            None,
+            self.raw_record({"id": 17, "userid": 9, "team": 4}),
+        ]
+        experiment = self.client.create_experiment("Measurement", owner_id=9)
+        create, transfer, refresh = self.request.call_args_list
+        self.assertEqual(create.args[:2], ("/experiments", "POST"))
+        self.assertEqual(create.kwargs["body"], {"title": "Measurement"})
+        self.assertEqual(transfer.kwargs["body"],
+                         {"action": "updateowner", "userid": 9, "team": 4})
+        self.assertEqual(refresh.args[:3], ("/experiments/{id}", "GET", {"id": 17}))
+        self.assertEqual(experiment.owner_id, 9)
 
     def test_attachment_operations_keep_their_exact_record_and_upload_ids(self):
         self.request.return_value = None

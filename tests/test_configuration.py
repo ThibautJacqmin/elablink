@@ -206,7 +206,7 @@ class ConfigurationTests(unittest.TestCase):
                 with working_directory(other_project):
                     bridge.enqueue(SimpleNamespace(filepath=acquisition))
                     bridge.flush(timeout=3)
-                set_timeouts.assert_called_once_with(client, (5, 30))
+                set_timeouts.assert_called_once_with(client, (5, 30), (300, 300))
             finally:
                 bridge.close(timeout=3)
         self.assertEqual(len(worker_threads), 1)

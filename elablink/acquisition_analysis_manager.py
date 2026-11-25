@@ -50,6 +50,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
         config_path: Optional[Union[str, Path]] = None,
         spool_directory: Optional[Union[str, Path]] = None,
         request_timeout: Tuple[float, float] = (5, 30),
+        upload_timeout: Tuple[float, float] = (300, 300),
         client_factory: Optional[Callable[[], Any]] = None,
         **kwargs: Any,
     ) -> None:
@@ -62,6 +63,7 @@ class AcquisitionAnalysisManager(LabmateAcquisitionAnalysisManager):
             spool_directory=spool_directory,
             experiment_id=experiment_id,
             request_timeout=request_timeout,
+            upload_timeout=upload_timeout,
             client_factory=client_factory,
             analysis_directory=Path(str(self.data_directory)) / ".elabftw",
         )

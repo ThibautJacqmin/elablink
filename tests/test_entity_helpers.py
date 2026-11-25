@@ -34,6 +34,13 @@ class EntityHelperTests(unittest.TestCase):
             api.items.get_item.return_value.to_dict.return_value = data
         else:
             api.experiments.get_experiment.return_value.to_dict.return_value = data
+
+        def toggle(entity_type, entity_id, step_id, *, body):
+            self.assertEqual(body, {"action": "finish"})
+            row = next(row for row in data["steps"] if row["id"] == step_id)
+            row["finished"] = 0 if row["finished"] else 1
+
+        api.steps.patch_step.side_effect = toggle
         return entity, api, data
 
     def test_changed_attachment_routes_to_replacement_helper(self):
