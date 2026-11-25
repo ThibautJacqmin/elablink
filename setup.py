@@ -7,7 +7,7 @@ README = (BASE_DIR / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="elablink",
-    version="0.1.1",
+    version="0.2.0a1",
     description="Python helpers for eLabFTW and asynchronous Labmate acquisition uploads",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -26,7 +26,9 @@ setup(
         "urllib3",
         "tomli; python_version < '3.11'",
     ],
+    entry_points={"gui_scripts": ["elablink-attachments=elablink.attachment_browser:main"]},
     extras_require={
+        "browser": ["PyQt6>=6.5,<7", "pypdfium2>=4,<6"],
         "labmate": ["labmate>=0.10.10", "matplotlib"],
         "docs": ["Sphinx>=8.2,<9", "sphinx-rtd-theme>=3.1,<4"],
     },

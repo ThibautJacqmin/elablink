@@ -472,6 +472,16 @@ class Experiment:
             finally:
                 temporary.unlink(missing_ok=True)
 
+    def browse_files(self, folder: str | Path | None = None):
+        """Open the experimental attachment browser without blocking Python.
+
+        Returns the browser process; transfers run independently of notebook
+        cells and acquisitions.
+        """
+        from .attachment_browser import browse_files
+
+        return browse_files(self, folder=folder)
+
     def add_step(self, text: str, *, checked: bool = False) -> Step:
         """Append a step, optionally check its box, and return that exact step."""
         if not isinstance(text, str) or not text.strip():
