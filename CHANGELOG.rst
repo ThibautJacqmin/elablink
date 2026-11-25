@@ -14,7 +14,8 @@ eLabLink release notes
   server and report conflicting edits.
 * Remember the original experiment for an H5 acquisition opened from another
   analysis project. New uploads write a portable association beside the H5 file.
-  Older files can use the original data directory's index.
+  Older files can use the original data directory's index. A captured checkpoint
+  can finish uploading when Labmate replaces the original local H5 file.
 * Configure background file upload timeouts independently of other API requests.
   Protect acquisition snapshots against linked files and keep sensitive HTTP
   response details out of background error reports. On macOS, acquisitions can
