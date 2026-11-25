@@ -1,6 +1,16 @@
 eLabLink release notes
 =====================
 
+0.3.0a2 (prerelease)
+--------------------
+
+* Record search stays open on the left, including when the browser opens
+  directly on an experiment or resource. Drag the divider to resize it.
+* The **Clear cache** button shows the total size of local cached attachments
+  and can clear downloads across all records. **Cached downloads…** still
+  clears a single record. Both actions preserve attachments on eLabFTW and
+  files saved to a working folder or with **Save as…**.
+
 0.3.0a1 (prerelease)
 --------------------
 

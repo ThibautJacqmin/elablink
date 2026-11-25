@@ -39,11 +39,12 @@ class AttachmentShortcutTests(unittest.TestCase):
             setattr(self, name, patcher.start())
             self.addCleanup(patcher.stop)
         self.window = browser.AttachmentBrowser(
-            "unused.conf", "experiments", 123,
+            "unused.conf", "experiments", 123, cache_directory=self.directory / "cache",
             store_factory=lambda: self.store, preview_store_factory=lambda: self.preview_store,
         )
         self.addCleanup(self.close_window)
-        self.window.show()
+        with patch("elablink._attachment_record_picker_qt._RecordList._refresh"):
+            self.window.show()
         self.window.activateWindow()
         self.wait_for(lambda: len(self.window.rows) == 3 and not self.window.busy)
 

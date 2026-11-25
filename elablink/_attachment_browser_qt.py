@@ -22,15 +22,15 @@ from PyQt6.QtCore import QByteArray, QEvent, QEventLoop, QItemSelectionModel, QM
 from PyQt6.QtGui import QAction, QDesktopServices, QDrag, QIcon, QKeySequence, QPainter, QPalette, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
-    QApplication, QDockWidget, QFileDialog, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
+    QApplication, QFileDialog, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QStyle,
-    QSplitter, QStackedWidget, QTextBrowser, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QSplitter, QStackedWidget, QTextBrowser, QToolBar, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ._attachment_archive import create_zip, extract_zip, list_zip
 from ._attachment_preview_qt import IMAGE_PREVIEW_SUFFIXES, PREVIEW_SUFFIXES, PreviewPanel, load_preview
 from ._attachment_record_picker_qt import RecordPicker
-from ._attachment_store import AttachmentStore
+from ._attachment_store import AttachmentStore, attachment_cache_info, clear_attachment_cache
 from .attachment_browser import open_h5viewer, open_klayout
 from ._paths import checked_working_folder
 from .config import resolve_browser_folder, resolve_config_path
@@ -176,13 +176,30 @@ class _StoreWorker(QObject):
 class _Worker(_StoreWorker):
     finished = pyqtSignal(object)
     progress = pyqtSignal(object)
+    cache_measured = pyqtSignal(object)
+
+    def __init__(self, factory, cache_directory):
+        super().__init__(factory)
+        self.cache_directory = cache_directory
+
+    @pyqtSlot(object)
+    def measure_cache(self, cancel):
+        try:
+            info = attachment_cache_info(self.cache_directory, cancel=cancel)
+        except Exception as error:
+            info = {"error": _error_message(error)}
+        self.cache_measured.emit(info)
 
     @pyqtSlot(object)
     def run(self, job):
         try:
+            operation = job["operation"]
+            if operation in {"all_cache_info", "clear_all_cache"}:
+                cache_operation = attachment_cache_info if operation == "all_cache_info" else clear_attachment_cache
+                self.finished.emit({"cache": cache_operation(self.cache_directory, cancel=job["cancel"])})
+                return
             if self.store is None:
                 self.store = self.factory()
-            operation = job["operation"]
             args, kwargs = job["args"], job["kwargs"]
             transfer = {"progress": lambda *values: self.progress.emit(values),
                         "cancel": job["cancel"]}
@@ -253,6 +270,7 @@ class _PreviewWorker(_StoreWorker):
             if path is None or not path.is_file():
                 if self.store is None:
                     self.store = self.factory()
+                result["download_attempted"] = True
                 path = self.store.download([job["row"]], cancel=job["cancel"], max_bytes=_AUTO_PREVIEW_BYTES)[0]
             if Path(path).stat().st_size > _AUTO_PREVIEW_BYTES:
                 raise ValueError("This file is too large for automatic preview. Use Open or Save as… instead.")
@@ -380,6 +398,7 @@ class AttachmentBrowser(QMainWindow):
     requested = pyqtSignal(object)
     preview_requested = pyqtSignal(object)
     store_changed = pyqtSignal(object)
+    cache_size_requested = pyqtSignal(object)
 
     def __init__(self, config_path, entity_type=None, entity_id=None, cache_directory=None,
                  *, folder=None, store_factory=None, preview_store_factory=None):
@@ -407,31 +426,38 @@ class AttachmentBrowser(QMainWindow):
         self._folder = checked_working_folder(folder) if folder is not None else None
         self._config_path = config_path
         self._cache_directory = cache_directory
+        self._cache_files = 0
+        self._cache_scan_pending = False
+        self._cache_scan_again = False
+        self._cache_scan_cancel = threading.Event()
         self._record = (entity_type, entity_id) if entity_id is not None else None
         self._next_record = None
         self._record_label = self._format_record_label(*self._record) if self._record else "Select an experiment or resource"
 
-        self.record_dock = QDockWidget("Find a record", self)
-        self.record_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
-        self.record_picker = RecordPicker(config_path, self.record_dock)
+        self.record_picker = RecordPicker(config_path)
+        self.record_picker.setAccessibleName("Record search")
         if self._record:
             self.record_picker.set_entity_type(entity_type)
         self.record_picker.recordSelected.connect(self.open_record)
-        self.record_dock.setWidget(self.record_picker)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.record_dock)
-        self.record_dock.setVisible(self._record is None)
 
-        central = QWidget(self)
-        layout = QVBoxLayout(central)
+        attachments = QWidget()
+        layout = QVBoxLayout(attachments)
         self.heading = QLabel(self._record_label)
         self.heading.setTextFormat(Qt.TextFormat.PlainText)
         self.heading.setStyleSheet("font-size: 17px; font-weight: 600; padding: 6px 0;")
         header = QHBoxLayout()
         header.addWidget(self.heading, 1)
-        find_record = QToolButton()
-        find_record.setDefaultAction(self.record_dock.toggleViewAction())
-        find_record.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        header.addWidget(find_record)
+        cache_controls = QVBoxLayout()
+        cache_controls.setSpacing(1)
+        self.clear_cache_button = QPushButton("Clear cache")
+        self.clear_cache_button.setToolTip("Clear cached attachments for all experiments and resources on this computer.")
+        self.clear_cache_button.clicked.connect(self.clear_all_cached_downloads)
+        self.cache_size_label = QLabel("…")
+        self.cache_size_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.cache_size_label.setAccessibleName("Total attachment cache size")
+        cache_controls.addWidget(self.clear_cache_button)
+        cache_controls.addWidget(self.cache_size_label)
+        header.addLayout(cache_controls)
         layout.addLayout(header)
         self.storage_label = QLabel()
         self.storage_label.setTextFormat(Qt.TextFormat.PlainText)
@@ -485,7 +511,13 @@ class AttachmentBrowser(QMainWindow):
         self.splitter.addWidget(self.preview_stack)
         self.splitter.setSizes([680, 520])
         layout.addWidget(self.splitter, 1)
-        self.setCentralWidget(central)
+        panes = QSplitter(Qt.Orientation.Horizontal)
+        panes.addWidget(self.record_picker)
+        panes.addWidget(attachments)
+        panes.setChildrenCollapsible(False)
+        panes.setStretchFactor(1, 1)
+        panes.setSizes([320, 920])
+        self.setCentralWidget(panes)
 
         toolbar = self.attachments_toolbar = QToolBar("Attachments", self)
         toolbar.setMovable(False)
@@ -534,6 +566,7 @@ class AttachmentBrowser(QMainWindow):
         self.choose_folder_action = self._action(tools, "Working folder…", self.choose_working_folder, "working_folder")
         self.temporary_folder_action = self._action(tools, "Use temporary cache", self.use_temporary_cache, "temporary_cache")
         self.cache_action = self._action(tools, "Cached downloads…", self.show_cache, "cache")
+        self.cache_action.setToolTip("View or clear cached downloads for this record")
         self.refresh_local_action = self._action(tools, "Refresh local copy from server…",
                                                  self.refresh_local_copy, "refresh_local")
         tools.addSeparator()
@@ -564,12 +597,14 @@ class AttachmentBrowser(QMainWindow):
 
         factory = store_factory or self._store_factory(entity_type, entity_id)
         self._thread = QThread(self)
-        self._worker = _Worker(factory)
+        self._worker = _Worker(factory, cache_directory)
         self._worker.moveToThread(self._thread)
         self.store_changed.connect(self._worker.set_store_factory, Qt.ConnectionType.QueuedConnection)
         self.requested.connect(self._worker.run, Qt.ConnectionType.QueuedConnection)
         self._worker.finished.connect(self._completed)
         self._worker.progress.connect(self._progress)
+        self.cache_size_requested.connect(self._worker.measure_cache, Qt.ConnectionType.QueuedConnection)
+        self._worker.cache_measured.connect(self._cache_measured)
         self._thread.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread_stopped)
         self._thread.start()
@@ -586,6 +621,7 @@ class AttachmentBrowser(QMainWindow):
         self._preview_thread.finished.connect(self._preview_worker.deleteLater)
         self._preview_thread.finished.connect(self._thread_stopped)
         self._preview_thread.start()
+        self._refresh_cache_size()
         self._update_actions()
         if self._record:
             QTimer.singleShot(0, self.refresh)
@@ -699,7 +735,9 @@ class AttachmentBrowser(QMainWindow):
 
     def _update_actions(self):
         count = len(self.selected_rows())
-        active = bool(self._record) and not self.busy and not self._close_requested and not self._preview_paused
+        idle = not self.busy and not self._close_requested and not self._preview_paused
+        self.clear_cache_button.setEnabled(idle and self._cache_files > 0)
+        active = bool(self._record) and idle
         for action in (self.refresh_action, self.upload_action, self.paste_action,
                        self.record_link_action, self.cache_action, self.choose_folder_action):
             action.setEnabled(active)
@@ -810,6 +848,8 @@ class AttachmentBrowser(QMainWindow):
         self._preview_busy = False
         if self._close_requested:
             return
+        if result.get("download_attempted"):
+            self._refresh_cache_size()
         if "path" in result and "error" not in result:
             self._cached_paths[_cache_key(result["row"])] = result["path"]
         if self._preview_paused:
@@ -948,16 +988,18 @@ class AttachmentBrowser(QMainWindow):
             self._begin("extract", (self._archive_path, Path(directory)))
 
     def _begin(self, operation, args=(), *, intent=None, rows=(), **kwargs):
-        if (not self._record or self.busy or self._close_requested
-                or (self._preview_paused and operation not in {"cache_info", "clear_cache", "set_folder"}
-                    and intent != "refresh_local")):
+        global_cache = operation in {"all_cache_info", "clear_all_cache"}
+        if self.busy or self._close_requested or (not self._record and not global_cache):
+            return
+        if (self._preview_paused and not global_cache and operation not in {"cache_info", "clear_cache", "set_folder"}
+                and intent != "refresh_local"):
             return
         self.busy = True
         self._cancel = threading.Event()
-        self._pending = {"intent": intent or operation, "rows": list(rows)}
+        self._pending = {"operation": operation, "intent": intent or operation, "rows": list(rows)}
         self.progress.setRange(0, 0)
         self.progress.show()
-        self.cancel_button.setVisible(operation in {"download", "save", "save_many", "open", "upload", "delete", "extract", "zip"})
+        self.cancel_button.setVisible(operation in {"download", "save", "save_many", "open", "upload", "delete", "extract", "zip", "clear_all_cache"})
         self.cancel_button.setEnabled(True)
         message = "Loading attachments…" if operation == "list" else "Working…"
         if intent == "copy":
@@ -994,6 +1036,9 @@ class AttachmentBrowser(QMainWindow):
         if self._close_requested:
             self._thread.quit()
             return
+        if pending["operation"] in {"download", "open", "zip", "clear_cache"} or (
+                pending["operation"] == "clear_all_cache" and "error" in result):
+            self._refresh_cache_size()
         if pending["intent"] == "list" and self._next_record is not None:
             record, self._next_record = self._next_record, None
             if record != self._record:
@@ -1023,18 +1068,23 @@ class AttachmentBrowser(QMainWindow):
             for row, path in zip(pending["rows"], paths):
                 self._cached_paths[_cache_key(row)] = Path(path)
         intent = pending["intent"]
-        if intent == "cache_info":
+        if intent in {"cache_info", "all_cache_info"}:
             info = result["cache"]
+            whole_cache = intent == "all_cache_info"
+            if whole_cache:
+                self._display_cache_size(info)
+            scope = "all experiments and resources" if whole_cache else "this record"
+            noun = "file" if info["files"] == 1 else "files"
             answer = QMessageBox.question(
-                self, "Cached downloads",
-                f"This record has {info['files']} cached files ({_size_text(info['bytes'])}).\n\n"
-                "Clear these local copies? Clipboard links and viewers may still use them.\n"
+                self, "Clear cache" if whole_cache else "Cached downloads",
+                f"Clear {info['files']} cached {noun} ({_size_text(info['bytes'])}) for {scope}?\n\n"
+                "Clipboard links and viewers may still use these local copies. "
                 "Working files, Save as… copies and attachments on eLabFTW are kept.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
             if answer == QMessageBox.StandardButton.Yes:
-                self._begin("clear_cache")
+                self._begin("clear_all_cache" if whole_cache else "clear_cache")
             else:
                 self._resume_preview()
         elif intent == "set_folder":
@@ -1047,7 +1097,9 @@ class AttachmentBrowser(QMainWindow):
         elif intent == "refresh_local":
             self._resume_preview()
             self.statusBar().showMessage("Local copy refreshed from eLabFTW.")
-        elif intent == "clear_cache":
+        elif intent in {"clear_cache", "clear_all_cache"}:
+            if intent == "clear_all_cache":
+                self._display_cache_size(result["cache"])
             self._cached_paths.clear()
             self._archive_path = None
             self.preview_stack.setCurrentWidget(self.preview)
@@ -1296,8 +1348,43 @@ class AttachmentBrowser(QMainWindow):
     def copy_record_link(self):
         self._begin("links", record=True)
 
-    def show_cache(self):
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if (event.type() == QEvent.Type.ActivationChange and self.isActiveWindow()
+                and hasattr(self, "_worker")):
+            self._refresh_cache_size()
+
+    def _refresh_cache_size(self):
+        if self._close_requested:
+            return
+        if self._cache_scan_pending:
+            self._cache_scan_again = True
+        else:
+            self._cache_scan_pending = True
+            self.cache_size_requested.emit(self._cache_scan_cancel)
+
+    @pyqtSlot(object)
+    def _cache_measured(self, info):
+        self._cache_scan_pending = False
+        if self._close_requested:
+            return
+        self._display_cache_size(info)
+        if self._cache_scan_again:
+            self._cache_scan_again = False
+            self._refresh_cache_size()
+
+    def _display_cache_size(self, info):
+        self._cache_files = info.get("files", 0)
+        self.cache_size_label.setText(_size_text(info["bytes"]) if "bytes" in info else "Unavailable")
+        self.cache_size_label.setToolTip(info.get("error", "Total size of cached attachments on this computer"))
+        self._update_actions()
+
+    def clear_all_cached_downloads(self):
         if not self.busy and not self._preview_paused and not self._close_requested:
+            self._pause_preview(lambda: self._begin("all_cache_info"))
+
+    def show_cache(self):
+        if self._record and not self.busy and not self._preview_paused and not self._close_requested:
             self._pause_preview(lambda: self._begin("cache_info"))
 
     def rename_selected(self):
@@ -1346,6 +1433,7 @@ class AttachmentBrowser(QMainWindow):
             self._close_requested = True
             self._thread.quit()
         if self._close_requested:
+            self._cache_scan_cancel.set()
             self._preview_timer.stop()
             self._preview_cancel.set()
             self._preview_thread.quit()
