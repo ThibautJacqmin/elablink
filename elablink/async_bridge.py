@@ -15,6 +15,7 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from ._paths import absolute_storage_path
 from .async_experiment import AsyncExperiment
 from .bridge import Bridge
 from .client import Client
@@ -299,7 +300,7 @@ class AsyncBridge:
     def enqueue(self, data: Any, *, label: str = "snapshot") -> Future:
         """Capture a saved acquisition or analysis locally and queue its upload."""
         self._check_open()
-        original = Path(str(data.filepath)).expanduser().absolute()
+        original = absolute_storage_path(str(data.filepath))
         h5_path = original if str(original).endswith(".h5") else Path(str(original) + ".h5")
         _check_source_path(h5_path)
         prefix = h5_path.resolve()
