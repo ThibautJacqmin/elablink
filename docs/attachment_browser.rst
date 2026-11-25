@@ -3,7 +3,7 @@ Experimental attachment browser
 
 The attachment browser is an optional desktop window for finding experiments
 and resources and managing their files. It is **experimental** in eLabLink
-0.3.0a1 and has less testing than the core Python API. The browser has been
+0.3.0a2 and has less testing than the core Python API. The browser has been
 exercised on Windows against a live eLabFTW server and with offline
 experiment and resource records on Ubuntu 24.04 under WSLg, using both
 Wayland and X11. The installed launcher and single-click navigation were
@@ -20,7 +20,7 @@ Before installing
 * Use a computer with a graphical desktop and Python 3.10 or newer. The
   examples use a dedicated Python environment so you can try the alpha
   alongside an existing stable eLabLink installation.
-* Obtain ``elablink-0.3.0a1-py3-none-any.whl`` from the maintainer or from
+* Obtain ``elablink-0.3.0a2-py3-none-any.whl`` from the maintainer or from
   the published prerelease's **Assets** on `GitHub Releases
   <https://github.com/ThibautJacqmin/eLabLink/releases>`_. Save it in your
   **Downloads** folder. Windows, macOS and Linux use the same eLabLink wheel.
@@ -74,7 +74,7 @@ Windows installation and first launch
       $browserDir = Join-Path $HOME 'eLabLink Browser'
       py -3 -m venv "$browserDir\venv"
       Set-Location -LiteralPath "$HOME\Downloads"
-      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a1-py3-none-any.whl[browser]"
+      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a2-py3-none-any.whl[browser]"
 
 2. Run ``notepad "$browserDir\elablink.conf"``. Paste the configuration
    above, fill in your values and save. If **Save As** opens, choose
@@ -87,8 +87,8 @@ Windows installation and first launch
 
       & "$browserDir\venv\Scripts\elablink-attachments.exe" --config-path "$browserDir\elablink.conf"
 
-   **Find a record** should display your experiments. Choose **Resources**
-   to browse the other entry type. Close the window after this first check.
+   The **Experiments** tab on the left should display your experiments.
+   Choose **Resources** to browse resources. Close the window after this first check.
 
 Windows desktop shortcut (.lnk)
 -------------------------------
@@ -164,7 +164,7 @@ separately (for example, ``python3-venv`` on Debian and Ubuntu).
    browser_dir="$HOME/eLabLink Browser"
    python3 -m venv "$browser_dir/venv"
    cd "$HOME/Downloads"
-   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a1-py3-none-any.whl[browser]"
+   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a2-py3-none-any.whl[browser]"
 
 Create the private config in a plain-text editor. For example, run these
 commands, paste the configuration shown above, and in ``nano`` press
@@ -244,17 +244,18 @@ that action. See the `freedesktop Exec specification
 Search and open a record
 ------------------------
 
-Choose **Experiments** or **Resources** in **Find a record**. Search by
-text, category, status or tag. Category and status choices belong to the
+The search panel on the left stays open, including when you launch the
+browser for a specific record. Drag the divider to adjust its width.
+Choose **Experiments** or **Resources**, then search by text, category,
+status or tag. Category and status choices belong to the
 current tab. Selecting several tags requires every tag to match. Selecting
 several categories or statuses accepts any selected value within that filter.
 Single-click a result to show its files, or focus it and press **Enter**.
 
 The panel reads categories, statuses and tags from eLabFTW and displays
-the team's category and status colours. Open the panel, switch tabs or
-click its refresh button to pick up team changes. The filename filter above
-the attachment list applies to the open record. Use **Find a record** to show
-or hide the selector.
+the team's category and status colours. Switch tabs or click the panel's
+refresh button to pick up team changes. The filename filter above the
+attachment list applies to the open record.
 
 From a project using the prerelease, you can also open a known record in
 a separate browser window.
@@ -390,12 +391,16 @@ For a default folder, add this to the root ``pyproject.toml``:
    browser_folder = "attachments"
 
 Relative folders are resolved from that project file. Without a working folder,
-the browser caches files locally. Its cache and child-process logs live under
-``%TEMP%\elablink`` on Windows, ``~/Library/Caches/elablink`` on macOS, and
-``$XDG_CACHE_HOME/elablink`` on Linux (default ``~/.cache/elablink``).
-The second toolbar row opens a downloaded file's local folder and shows or
-clears cached downloads. Cache cleanup asks for confirmation and keeps working
-files and copies saved with **Save as…**.
+the browser caches files locally. On Windows, the attachment cache is in
+``%TEMP%\elablink-attachments``. On macOS it is in
+``~/Library/Caches/elablink/attachments``, and on Linux it is in
+``$XDG_CACHE_HOME/elablink/attachments`` (default ``~/.cache/elablink/attachments``).
+
+The size below **Clear cache** in the upper-right corner is the total for all
+experiments and resources in this browser cache. Click the button and confirm
+to clear those local downloads. To clear only the selected record, use
+**Cached downloads…** in the second toolbar row. Both actions preserve working
+files, **Save as…** copies and attachments on eLabFTW.
 
 H5 files downloaded from experiments also get a small ``run.h5.elablink.json``
 file. Keep it beside the H5 file: the notebook manager uses it to save later

@@ -20,7 +20,7 @@ if HAS_QT:
     from PyQt6.QtCore import QEvent, QMimeData, QPoint, QPointF, QTimer, Qt, QUrl
     from PyQt6.QtGui import QColor, QDropEvent, QImage, QMouseEvent, QPainter, QPdfWriter
     from PyQt6.QtTest import QTest
-    from PyQt6.QtWidgets import QApplication, QMessageBox
+    from PyQt6.QtWidgets import QAbstractButton, QApplication, QMessageBox
     import elablink._attachment_browser_qt as browser
 
 
@@ -151,8 +151,15 @@ class QtAttachmentBrowserTests(unittest.TestCase):
             patcher = patch.object(QMessageBox, name, return_value=QMessageBox.StandardButton.Cancel)
             setattr(self, name, patcher.start())
             self.addCleanup(patcher.stop)
-        self.window = browser.AttachmentBrowser("unused.conf", "experiments", 123,
-                                                 store_factory=factory, preview_store_factory=lambda: self.preview_store)
+        # These window tests exercise attachments using in-memory record results.
+        refresh = patch("elablink._attachment_record_picker_qt._RecordList._refresh")
+        refresh.start()
+        self.addCleanup(refresh.stop)
+        self.cache = self.directory / "cache"
+        self.window = browser.AttachmentBrowser(
+            "unused.conf", "experiments", 123, cache_directory=self.cache,
+            store_factory=factory, preview_store_factory=lambda: self.preview_store,
+        )
         self.addCleanup(self.close_window)
         self.window.show()
         self.wait_for(lambda: len(self.window.rows) == 3 and not self.window.busy)
@@ -642,6 +649,83 @@ class QtAttachmentBrowserTests(unittest.TestCase):
         self.assertEqual(directory, self.directory / "17")
         self.assertTrue((directory / "zeta.txt").is_file())
 
+    def test_global_cache_is_visible_and_can_be_cleared_without_opening_a_record(self):
+        from elablink._attachment_store import AttachmentStore
+        from tests.test_attachment_store import FakeClient
+
+        self.close_window()
+        client = FakeClient()
+        cached = []
+        for kind, identifier, data in (("experiments", 1, b"abc"), ("items", 2, b"defgh")):
+            row = client.add("sample.txt", data)
+            store = AttachmentStore(None, kind, identifier, self.cache, lambda: client)
+            cached.extend(store.download([row]))
+        working = self.directory / "working"
+        working.mkdir()
+        saved = working / "sample.txt"
+        saved.write_bytes(b"my local changes")
+        unused_store = Mock(side_effect=AssertionError("Cache cleanup requested a record store"))
+        self.window = browser.AttachmentBrowser(
+            "unused.conf", cache_directory=self.cache, folder=working,
+            store_factory=unused_store, preview_store_factory=unused_store,
+        )
+        self.window.show()
+        button, label = self.window.clear_cache_button, self.window.cache_size_label
+        self.wait_for(lambda: button.isEnabled() and label.text() == "8 B")
+        self.assertTrue(button.isVisible() and label.isVisible())
+        self.assertEqual(button.text(), "Clear cache")
+        button_bottom = button.mapToGlobal(button.rect().bottomLeft())
+        label_top = label.mapToGlobal(label.rect().topLeft())
+        self.assertGreater(label_top.y(), button_bottom.y())
+
+        QTest.mouseClick(button, Qt.MouseButton.LeftButton)
+        self.wait_for(lambda: self.question.called and button.isEnabled() and not self.window.busy)
+        message = self.question.call_args.args[2].lower()
+        self.assertIn("all", message)
+        self.assertRegex(message, r"record|experiment")
+        self.assertTrue(all(path.is_file() for path in cached))
+        self.assertEqual(label.text(), "8 B")
+
+        self.question.return_value = QMessageBox.StandardButton.Yes
+        QTest.mouseClick(button, Qt.MouseButton.LeftButton)
+        self.wait_for(lambda: label.text() == "0 B" and not self.window.busy)
+        self.assertFalse(button.isEnabled())
+        self.assertFalse(any(path.exists() for path in cached))
+        self.assertEqual(saved.read_bytes(), b"my local changes")
+        unused_store.assert_not_called()
+        self.warning.assert_not_called()
+
+    def test_global_cache_size_tracks_previews_downloads_and_record_cleanup(self):
+        from elablink._attachment_store import AttachmentStore
+        from tests.test_attachment_store import FakeClient
+
+        client = FakeClient()
+        text = client.add("notes.txt", b"hello", ID=17)
+        binary = client.add("readings.bin", b"1234567", ID=2)
+        other_store = AttachmentStore(None, "items", 321, self.cache, lambda: client)
+        other, = other_store.download([text])
+        transfer = AttachmentStore(None, "experiments", 123, self.cache, lambda: client)
+        preview = AttachmentStore(None, "experiments", 123, self.cache, lambda: client)
+        self.store.download = transfer.download
+        self.store.cache_info = transfer.cache_info
+        self.store.clear_cache = transfer.clear_cache
+        self.preview_store.download = preview.download
+        self.window._show_rows([text, binary])
+
+        self.select(17)
+        self.wait_for(lambda: self.window._preview_ready and self.window.cache_size_label.text() == "10 B")
+        self.assertEqual(self.window.preview.text.toPlainText(), "hello")
+        self.select(2)
+        self.window.copy_selected()
+        self.wait_for(lambda: not self.window.busy and self.window.cache_size_label.text() == "17 B")
+
+        self.question.return_value = QMessageBox.StandardButton.Yes
+        self.window.cache_action.trigger()
+        self.wait_for(lambda: not self.window.busy and self.window.cache_size_label.text() == "5 B")
+        self.assertEqual(other.read_bytes(), b"hello")
+        self.assertTrue(self.window.clear_cache_button.isEnabled())
+        self.warning.assert_not_called()
+
     def test_cache_dialog_can_be_cancelled_or_cleared_without_redownloading(self):
         self.select(17)
         self.window.copy_selected()
@@ -651,7 +735,7 @@ class QtAttachmentBrowserTests(unittest.TestCase):
         self.wait_for(lambda: not self.window.busy and not self.window._preview_paused)
         self.assertTrue(cached.exists())
         self.assertNotIn("clear_cache", [operation for operation, _, _ in self.store.calls])
-        self.assertIn("1 cached files", self.question.call_args.args[2])
+        self.assertIn("1 cached file (", self.question.call_args.args[2])
         self.question.return_value = QMessageBox.StandardButton.Yes
         self.window.cache_action.trigger()
         self.wait_for(lambda: not self.window.busy and not self.window._preview_paused)
@@ -793,6 +877,34 @@ class QtAttachmentBrowserTests(unittest.TestCase):
         self.assertTrue(self.window._preview_cancel.is_set())
         self.preview_store.release.set()
         self.wait_for(lambda: not self.window._preview_thread.isRunning())
+
+    def test_record_search_stays_visible_with_or_without_a_starting_record(self):
+        self.assertTrue(self.window.record_picker.currentWidget().search.isVisible())
+        self.assertFalse(any(button.text() == "Find a record"
+                             for button in self.window.findChildren(QAbstractButton)))
+
+        self.close_window()
+        self.window = browser.AttachmentBrowser("unused.conf", cache_directory=self.cache)
+        self.window.show()
+        picker = self.window.record_picker
+        self.assertTrue(picker.currentWidget().search.isVisible())
+
+        picker.set_entity_type("items")
+        page = picker.currentWidget()
+        page._add_result({"id": 18, "title": "Cryostat"})
+        row_center = page.results.visualItemRect(page.results.item(0)).center()
+        with patch.object(browser, "AttachmentStore", return_value=self.store):
+            QTest.mouseClick(page.results.viewport(), Qt.MouseButton.LeftButton, pos=row_center)
+            self.wait_for(lambda: len(self.window.rows) == len(self.store.rows) and not self.window.busy)
+
+        self.assertIn("Resource 18", self.window.heading.text())
+        self.assertTrue(page.search.isVisible())
+        self.assertTrue(page.results.isVisible())
+        self.assertTrue(self.window.table.isVisible())
+
+        panes = self.window.centralWidget()
+        panes.setSizes([0, panes.width()])
+        self.assertGreater(picker.width(), 0)
 
     def test_switch_from_experiment_to_resource_drains_preview_and_rebinds_workers(self):
         self.preview_store.blocked_operation = "download"

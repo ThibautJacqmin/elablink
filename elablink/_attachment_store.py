@@ -10,6 +10,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import stat
 import tempfile
 import threading
 from typing import Any, Callable, Iterable, Mapping
@@ -585,3 +586,94 @@ class AttachmentStore:
                               progress=progress, cancel=cancel, max_bytes=max_bytes)
         self._remember_analysis_source(row, path)
         return path
+
+_CACHE_DIRECTORIES = (
+    re.compile(r"[0-9a-f]{16}"),                         # server
+    re.compile(r"(?:experiments|items)_[1-9][0-9]*"),   # record
+    re.compile(r"[1-9][0-9]*_[0-9a-f]{16}"),          # version of an upload
+)
+
+
+def _attachment_cache_root(cache_directory):
+    root = absolute_storage_path(cache_directory or browser_storage_directory("attachments"))
+    for part in (root, *root.parents):
+        if part.is_symlink() or is_junction(part):
+            raise ValueError("The attachment cache contains a symbolic link or an unsafe path")
+    return root.resolve()
+
+
+def _cache_children(directory, root):
+    AttachmentStore._check_managed_target(directory, root)
+    try:
+        return list(directory.iterdir())
+    except FileNotFoundError:
+        # The cache may not exist yet, or another window may have cleared this folder.
+        return []
+
+
+def _attachment_cache_files(root, cancel):
+    """Visit only cache-format directories. A custom root may hold unrelated files."""
+    directories = [root]
+    for pattern in _CACHE_DIRECTORIES:
+        matches = []
+        for directory in directories:
+            _cancelled(cancel)
+            for child in _cache_children(directory, root):
+                if pattern.fullmatch(child.name):
+                    AttachmentStore._check_cache_path(child, root)
+                    if child.is_dir():
+                        matches.append(child)
+        directories = matches
+
+    for directory in directories:
+        _cancelled(cancel)
+        for child in _cache_children(directory, root):
+            if child.match(".elablink-*.part") or child.match(".elablink-source-*.tmp"):
+                continue
+            try:
+                _filename(child.name)
+            except ValueError:
+                continue
+            AttachmentStore._check_cache_path(child, root)
+            try:
+                info = child.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISREG(info.st_mode):
+                yield child, info
+
+
+def attachment_cache_info(cache_directory=None, *, cancel=None) -> dict[str, Any]:
+    """Measure completed cached files across all servers and records, entirely locally."""
+    root = _attachment_cache_root(cache_directory)
+    count = total = 0
+    for _, info in _attachment_cache_files(root, cancel):
+        count += 1
+        total += info.st_size
+    return {"path": root, "files": count, "bytes": total}
+
+
+def clear_attachment_cache(cache_directory=None, *, cancel=None) -> dict[str, Any]:
+    """Clear completed downloads from the browser cache, preserving other local storage."""
+    root = _attachment_cache_root(cache_directory)
+    files = list(_attachment_cache_files(root, cancel))
+    removed_files = removed_bytes = 0
+    for path, previous in files:
+        _cancelled(cancel)
+        # Validate every ancestor again. A directory may have been replaced since the scan.
+        AttachmentStore._check_managed_target(path, root)
+        try:
+            current = path.lstat()
+            if not os.path.samestat(previous, current) or current.st_mtime_ns != previous.st_mtime_ns:
+                continue
+            path.unlink()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise OSError("Could not clear all cached downloads. Close applications using them and try again.") from error
+        removed_files += 1
+        removed_bytes += current.st_size
+    # Empty cache directories may be in use by another window starting a download.
+    result = attachment_cache_info(root, cancel=cancel)
+    result.update(removed_files=removed_files, removed_bytes=removed_bytes)
+    return result
