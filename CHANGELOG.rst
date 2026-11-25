@@ -21,7 +21,9 @@ Unreleased
 * Stream attachment downloads to a temporary file and replace the destination
   only when the transfer completes.
 * Accept both naming conventions for category and status APIs in supported
-  elabapi-python 6 versions.
+  elabapi-python 6 versions. Read the original metadata and team from the server
+  when loading a record so SDK conversion preserves custom-field settings and
+  ownership transfers can be verified.
 * Require HTTPS unless the configuration explicitly enables plain HTTP with
   ``ALLOW_INSECURE_HTTP=true``. Certificate verification settings accept
   ``true`` or ``false``.

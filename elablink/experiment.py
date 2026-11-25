@@ -21,8 +21,11 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 from typing import Any, Mapping, Optional
 from urllib.parse import urlencode
+
+import elabapi_python as ep
 
 
 class Experiment:
@@ -87,12 +90,41 @@ class Experiment:
         )
 
     def _load(self):
-        """Fetch the experiment data from the server and refresh cache."""
+        """Fetch this experiment or resource and refresh its cached fields."""
         if self.ID is None:
             raise DeletedExperiment()
-        exp = self.api.experiments.get_experiment(self.ID)
-        self._cache = exp.to_dict()
+        getter = (
+            self.api.items.get_item if self.entity_type == "items"
+            else self.api.experiments.get_experiment
+        )
+        endpoint = getattr(getter, "__self__", None)
+        if isinstance(endpoint, (ep.ExperimentsApi, ep.ItemsApi)):
+            data = self._read_sdk_record(getter, endpoint.api_client)
+        else:
+            data = getter(self.ID).to_dict()
+        self._cache = data
         return self._cache
+
+    def _read_sdk_record(self, getter, api_client) -> dict[str, Any]:
+        # SDK 6.0.1 drops Entity.team and dynamic metadata keys while decoding.
+        # Parse the single response, preserving SDK normalization for other fields.
+        response = getter(self.ID, _preload_content=False)
+        try:
+            record = json.loads(response.data)
+        finally:
+            try:
+                response.close()
+            finally:
+                response.release_conn()
+        if (not isinstance(record, dict) or type(record.get("id")) is not int
+                or record["id"] != self.ID):
+            raise ValueError("The eLabFTW response did not identify the requested record")
+
+        metadata = record.pop("metadata", None)
+        model = api_client.deserialize(SimpleNamespace(data=json.dumps(record)), "Entity")
+        data = model.to_dict()
+        data.update(metadata=metadata, team=record.get("team"), userid=record.get("userid"))
+        return data
 
     def refresh(self) -> dict[str, Any]:
         """Refresh and return the cached experiment data."""
@@ -137,20 +169,25 @@ class Experiment:
             # Even a failed request can have reached the server. Do not retain
             # cached ownership after an attempted transfer or retry it blindly.
             self._cache = None
+        expected = {"id": self.ID, "userid": user_id, "team": team_id}
         try:
             data = self._load()
         except Exception as exc:
+            self._cache = None
             raise OwnershipTransferError(
                 self.entity_type, self.ID,
                 "The server accepted the ownership transfer, but it could not "
                 "be verified. Read access may have changed. Inspect this ID "
                 "before retrying.",
             ) from exc
-        if data.get("userid") != user_id or data.get("team") != team_id:
+        if any(
+            type(data.get(key)) is not int or data[key] != value
+            for key, value in expected.items()
+        ):
             self._cache = None
             raise OwnershipTransferError(
                 self.entity_type, self.ID,
-                "The server did not confirm the requested owner and team. "
+                "The server did not confirm the record ID, owner and team. "
                 "Inspect this ID before retrying.",
             )
 

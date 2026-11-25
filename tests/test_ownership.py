@@ -15,7 +15,7 @@ class OwnershipTests(unittest.TestCase):
     def entity(self, resource=False):
         api = Mock()
         api._get_team_id.return_value = 4
-        row = {"userid": 1, "team": 4, "title": "Test"}
+        row = {"id": 17, "userid": 1, "team": 4, "title": "Test"}
         entity = (Resource if resource else Experiment)(api, 17)
         entity._cache = dict(row)
         endpoint = api.items if resource else api.experiments
@@ -128,7 +128,7 @@ class CreationOwnershipTests(unittest.TestCase):
         self.client.templates.read_experiments_templates.return_value = [
             SimpleNamespace(title="Protocol", id=7)
         ]
-        self.row = {"userid": 1, "team": 4, "title": "New"}
+        self.row = {"id": 17, "userid": 1, "team": 4, "title": "New"}
         self.calls = []
 
         def patch(*, id, body):
