@@ -15,6 +15,9 @@ From the eLabLink project folder, in the Python environment you use:
 
 ``-e`` selects editable, or developer, mode: changes to this checkout are used without reinstalling the package. 
 
+For the optional experimental desktop browser, see :doc:`attachment_browser`
+for the prerelease installation and desktop shortcut instructions.
+
 Create your configuration
 -------------------------
 

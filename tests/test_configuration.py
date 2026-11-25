@@ -125,6 +125,41 @@ class ConfigurationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.resolve_from(self.examples)
 
+    def test_browser_storage_uses_each_platforms_user_directories(self):
+        for platform, xdg, expected in (
+            ("darwin", "", self.root / "Library" / "Caches" / "elablink"),
+            ("linux", "relative", self.root / ".cache" / "elablink"),
+            ("linux", str(self.root / "custom"), self.root / "custom" / "elablink"),
+        ):
+            with (self.subTest(platform=platform, xdg=xdg),
+                  patch.object(configuration.sys, "platform", platform),
+                  patch.object(Path, "home", return_value=self.root),
+                  patch.dict(os.environ, {"XDG_CACHE_HOME": xdg})):
+                for area in ("attachments", "browser-logs"):
+                    self.assertEqual(configuration.browser_storage_directory(area), expected / area)
+        with (patch.object(configuration.sys, "platform", "win32"),
+              patch.object(tempfile, "gettempdir", return_value=str(self.root))):
+            self.assertEqual(configuration.browser_storage_directory("attachments"), self.root / "elablink-attachments")
+            self.assertEqual(configuration.browser_storage_directory("browser-logs"), self.root / "elablink" / "browser-logs")
+
+    def test_browser_folder_only_setting_uses_default_configuration_file(self):
+        expected = self.credentials(self.project / "elablink.conf")
+        self.write(self.project / "pyproject.toml", '[tool.elablink]\nbrowser_folder = "attachments"\n')
+        self.assertEqual(self.resolve_from(self.examples), expected)
+
+    def test_nested_browser_folder_does_not_hide_parent_server_configuration(self):
+        expected = self.credentials(self.project / "server.conf")
+        self.pointer(self.project, "server.conf")
+        self.write(self.project / "examples" / "pyproject.toml", '[tool.elablink]\nbrowser_folder = "files"\n')
+        self.assertEqual(self.resolve_from(self.examples), expected)
+
+    def test_browser_folder_does_not_hide_a_misspelled_server_pointer(self):
+        self.credentials(self.project / "elablink.conf")
+        self.write(self.project / "pyproject.toml",
+                   '[tool.elablink]\nbrowser_folder = "files"\nconfig_pat = "other.conf"\n')
+        with self.assertRaisesRegex(ValueError, "config_path"):
+            self.resolve_from(self.examples)
+
     def test_invalid_tool_table_is_a_configuration_error(self):
         self.credentials(self.project / "elablink.conf")
         self.write(self.project / "pyproject.toml", "[tool]\nelablink = 'server.conf'\n")

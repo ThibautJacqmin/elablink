@@ -1,0 +1,99 @@
+name: Experimental attachment browser
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['prerelease/attachment-browser-*']
+  pull_request:
+    paths:
+      - '.github/workflows/browser-prerelease.yml'
+      - 'elablink/**'
+      - 'tests/**'
+      - 'examples/**'
+      - 'pyproject.toml'
+      - 'setup.py'
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: Wheel and offline GUI on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 libgl1 libx11-xcb1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 \
+            xvfb xauth
+
+      - name: Build wheel and create a clean install environment
+        run: |
+          python -m pip wheel --no-deps --wheel-dir dist .
+          python -m venv "$RUNNER_TEMP/browser-venv"
+          case "$RUNNER_OS" in
+            Windows) echo "$RUNNER_TEMP/browser-venv/Scripts" >> "$GITHUB_PATH" ;;
+            *) echo "$RUNNER_TEMP/browser-venv/bin" >> "$GITHUB_PATH" ;;
+          esac
+
+      - name: Install the wheel with the browser extra
+        run: |
+          wheel=(./dist/*.whl)
+          python -m pip install "${wheel[0]}[browser]"
+          python -m pip check
+
+      - name: Check the installed launcher and native single-click navigation
+        run: |
+          python -I -c "import shutil, subprocess; from PyQt6 import QtWidgets; import pypdfium2; subprocess.run([shutil.which('elablink-attachments'), '--help'], check=True, timeout=30)"
+          native_test=(python -I -m unittest discover -s tests -p test_attachment_record_picker_qt.py -k test_one_mouse_click -v)
+          case "$RUNNER_OS" in
+            Linux)
+              plugins=$(python -I -c 'from PyQt6.QtCore import QLibraryInfo; print(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath))')
+              ldd "$plugins/platforms/libqxcb.so"
+              xvfb-run -a env QT_QPA_PLATFORM=xcb "${native_test[@]}"
+              ;;
+            macOS)   QT_QPA_PLATFORM=cocoa "${native_test[@]}" ;;
+            Windows) QT_QPA_PLATFORM=windows "${native_test[@]}" ;;
+          esac
+
+      - name: Install optional scientific and test dependencies
+        run: |
+          wheel=(./dist/*.whl)
+          python -m pip install "${wheel[0]}[labmate]" ipython h5py Pillow 'PyQt5>=5.15,<6' pytest
+          python -m pip check
+
+      - name: Run the full offline suite against the installed wheel
+        env:
+          ELABLINK_LIVE_TESTS: '0'
+          MPLBACKEND: Agg
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          # Keep the checkout's elablink/ out of Python's import path.
+          fixture_dir="$RUNNER_TEMP/browser-wheel-tests"
+          mkdir -p "$fixture_dir"
+          cp -R tests examples "$fixture_dir/"
+          cd "$fixture_dir"
+          export PYTHONPATH="$(python -c "import os; from pathlib import Path; root = Path.cwd(); print(os.pathsep.join(map(str, [root, root / 'tests'])))")"
+          python -c "import elablink, sys; from pathlib import Path; assert Path(elablink.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()), elablink.__file__"
+          python -m pytest -q -rs -p no:cacheprovider tests

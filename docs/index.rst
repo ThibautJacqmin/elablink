@@ -66,6 +66,12 @@ Previously saved data/code can also be retrieved from eLabFTW and reopened for f
    background_uploads
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Experimental desktop tools
+
+   attachment_browser
+
+.. toctree::
    :hidden:
    :maxdepth: 2
    :caption: Reference

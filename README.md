@@ -104,6 +104,15 @@ examples or contact a server.
 
 See the [release notes](CHANGELOG.rst) for compatibility and known limitations.
 
+## Experimental desktop attachment browser
+
+The optional browser in **0.3.0a1** lets you search experiments and resources
+and manage their attached files from a desktop window. It is under active
+development and has had less testing than the core Python interface.
+Install the `browser` extra to try it. The guide covers Windows shortcuts,
+macOS launchers, Linux desktop entries, and connecting to your server.
+[Attachment browser setup and usage](docs/attachment_browser.rst)
+
 ## Author and acknowledgements
 
 eLabLink is written and maintained by **Thibaut Jacqmin**. See

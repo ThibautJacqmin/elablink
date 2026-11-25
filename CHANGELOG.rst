@@ -1,6 +1,20 @@
 eLabLink release notes
 =====================
 
+0.3.0a1 (prerelease)
+--------------------
+
+The optional desktop attachment browser is experimental and has received less
+testing than the core eLabLink Python interface.
+
+* Find experiments and resources using the server's categories, statuses and
+  tags. Single-click a result to view its attachments.
+* Preview, download, upload and manage files, or open the browser for an
+  existing record with ``browse_files()``.
+* Install the ``browser`` extra to enable the Qt desktop interface and PDF
+  previews. See ``docs/attachment_browser.rst`` for Windows, macOS and Linux
+  installation and shortcut instructions.
+
 0.2.0 (2026-11-25)
 ------------------
 
