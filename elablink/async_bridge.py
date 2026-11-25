@@ -393,14 +393,24 @@ class AsyncBridge:
         self, snapshot: _Snapshot, attachments: Tuple[Path, ...], directory: Path
     ):
         original = Path(snapshot.original_filepath) if snapshot.original_filepath is not None else None
-        known = read_source(original, self._analysis_directory) if original is not None else None
         self._ensure_client()
+        known = read_source(original, self._analysis_directory) if original is not None else None
         server = self._client.configuration.host.rstrip("/")
         requested_id = snapshot.experiment_id if snapshot.experiment_id is not None else self.experiment_id
         if known is not None:
             if known.server.rstrip("/") != server:
                 raise ValueError("The local file belongs to a different eLabFTW server")
-            if requested_id is not None and known.experiment_id != requested_id:
+            if requested_id is None:
+                # An earlier queued save can legitimately have recorded this
+                # association. Never create a new record by title to check it.
+                previous = self._experiments.get(snapshot.experiment_name)
+                if previous is None:
+                    raise ValueError(
+                        "The local file's origin changed after capture. "
+                        "Check its eLabFTW association before queuing a new save."
+                    )
+                requested_id = previous.ID
+            if known.experiment_id != requested_id:
                 raise ValueError("The local file belongs to a different eLabFTW experiment")
         experiment = self._ensure_remote(snapshot)
         source = RemoteSource(experiment.ID, snapshot.experiment_name, server)

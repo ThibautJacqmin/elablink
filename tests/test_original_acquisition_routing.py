@@ -43,6 +43,18 @@ class OriginalSourceTests(unittest.TestCase):
         self.bridges.append(bridge)
         return bridge
 
+    def blocked_bridge(self, client, **kwargs):
+        entered, release = threading.Event(), threading.Event()
+        self.releases.append(release)
+
+        def factory():
+            entered.set()
+            if not release.wait(5):
+                raise TimeoutError("Test did not release worker")
+            return client
+
+        return self.bridge(factory, **kwargs), entered, release
+
     def test_old_catalog_is_found_by_exact_original_path_from_another_project(self):
         remember_source(self.original, self.source, self.catalog)
         self.assertEqual(read_source(self.original, self.analysis_catalog), self.source)
@@ -71,17 +83,9 @@ class OriginalSourceTests(unittest.TestCase):
         self.assertEqual(client.experiment.files, {})
 
     def test_origin_added_after_capture_is_checked_before_file_upload(self):
-        entered, release = threading.Event(), threading.Event()
-        self.releases.append(release)
         client = OfflineClient()
 
-        def factory():
-            entered.set()
-            if not release.wait(5):
-                raise TimeoutError("Test did not release worker")
-            return client
-
-        bridge = self.bridge(factory, experiment_id=1)
+        bridge, entered, release = self.blocked_bridge(client, experiment_id=1)
         bridge.enqueue(SimpleNamespace(filepath=self.original))
         self.assertTrue(entered.wait(3))
         write_source_manifest(self.original, RemoteSource(2, "Other", self.source.server))
@@ -91,18 +95,42 @@ class OriginalSourceTests(unittest.TestCase):
         self.assertEqual(client.experiment.files, {})
         self.assertTrue(list(bridge.spool_directory.rglob("*.h5")))
 
-    def test_removed_original_does_not_prevent_uploading_the_captured_checkpoint(self):
-        entered, release = threading.Event(), threading.Event()
-        self.releases.append(release)
+    def test_late_origin_does_not_create_a_record_from_the_queued_title(self):
+        client = MultiExperimentClient()
+        other = client.create_experiment(title="Different experiment")
+        client.create_titles.clear()
+
+        bridge, entered, release = self.blocked_bridge(client)
+        bridge.enqueue(SimpleNamespace(filepath=self.original))
+        self.assertTrue(entered.wait(3))
+        write_source_manifest(self.original, RemoteSource(other.ID, "Different experiment", self.source.server))
+        release.set()
+
+        with self.assertRaisesRegex(RuntimeError, "origin changed"):
+            bridge.flush(timeout=5)
+        self.assertEqual(client.create_titles, [])
+        self.assertEqual(other.files, {})
+        self.assertTrue(list(bridge.spool_directory.rglob("*.h5")))
+
+    def test_queued_saves_accept_the_origin_recorded_by_the_first_save(self):
         client = OfflineClient()
 
-        def factory():
-            entered.set()
-            if not release.wait(5):
-                raise TimeoutError("Test did not release worker")
-            return client
+        bridge, entered, release = self.blocked_bridge(client)
+        data = SimpleNamespace(filepath=self.original)
+        bridge.enqueue(data)
+        self.assertTrue(entered.wait(3))
+        self.original.write_bytes(b"updated measurement")
+        bridge.enqueue(data)
+        release.set()
 
-        bridge = self.bridge(factory)
+        self.assertEqual(bridge.flush(timeout=5)["id"], self.source.experiment_id)
+        self.assertEqual(client.created, 1)
+        self.assertEqual(client.experiment.files, {"run.h5": b"updated measurement"})
+
+    def test_removed_original_does_not_prevent_uploading_the_captured_checkpoint(self):
+        client = OfflineClient()
+
+        bridge, entered, release = self.blocked_bridge(client)
         bridge.enqueue(SimpleNamespace(filepath=self.original))
         self.assertTrue(entered.wait(3))
         self.original.unlink()
