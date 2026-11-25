@@ -9,13 +9,18 @@ remote eLabFTW experiments and their attachments, tags, steps, and comments.
 
 from __future__ import annotations
 
-from .exceptions import InvalidStatus, InvalidCategory, InvalidTag, DeletedExperiment
+from .exceptions import (
+    InvalidStatus, InvalidCategory, InvalidTag, DeletedExperiment,
+    OwnershipTransferError,
+)
 from .step import Step
 from datetime import date, datetime
 from html import escape
 import hashlib
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, Mapping, Optional
 from urllib.parse import urlencode
 
@@ -97,6 +102,62 @@ class Experiment:
         """Patch experiment attributes on the server and refresh cache."""
         self.api.experiments.patch_experiment(id=self.ID, body=updates)
         self._load()
+
+    @staticmethod
+    def _validate_ownership_id(value: int, name: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer user/team ID")
+        return value
+
+    def transfer_ownership(self, user_id: int, *, team_id: int | None = None) -> None:
+        """Transfer to an existing user and verify owner/team with a fresh read.
+
+        The destination defaults to the client's current team. The server
+        enforces account membership and permission to transfer. Populate the
+        record first: transferring may remove your read or write access.
+        A successful PATCH followed by a failed read raises
+        OwnershipTransferError; inspect the record before retrying.
+        """
+        if self.ID is None:
+            raise DeletedExperiment()
+        user_id = self._validate_ownership_id(user_id, "user_id")
+        team_id = self._validate_ownership_id(
+            self.api._get_team_id() if team_id is None else team_id, "team_id"
+        )
+        patch = (
+            self.api.items.patch_item if self.entity_type == "items"
+            else self.api.experiments.patch_experiment
+        )
+        try:
+            patch(
+                id=self.ID,
+                body={"action": "updateowner", "userid": user_id, "team": team_id},
+            )
+        finally:
+            # Even a failed request can have reached the server. Do not retain
+            # cached ownership after an attempted transfer or retry it blindly.
+            self._cache = None
+        try:
+            data = self._load()
+        except Exception as exc:
+            raise OwnershipTransferError(
+                self.entity_type, self.ID,
+                "The server accepted the ownership transfer, but it could not "
+                "be verified. Read access may have changed. Inspect this ID "
+                "before retrying.",
+            ) from exc
+        if data.get("userid") != user_id or data.get("team") != team_id:
+            self._cache = None
+            raise OwnershipTransferError(
+                self.entity_type, self.ID,
+                "The server did not confirm the requested owner and team. "
+                "Inspect this ID before retrying.",
+            )
+
+    @property
+    def owner_id(self) -> int | None:
+        """User ID of the owner; call refresh() to reload external changes."""
+        return self._data.get("userid")
 
     def _category_values(self) -> dict[str, int]:
         return self.api.category_dict
@@ -333,12 +394,46 @@ class Experiment:
         return None
 
     def download_file(self, file_id: int, destination: str | Path) -> Path:
-        """Download one upload to a local destination path."""
+        """Stream one upload to a local path, publishing only a complete file."""
         destination = Path(destination)
-        payload = self.api.download_upload(self.entity_type, self.ID, int(file_id))
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(payload)
-        return destination
+        descriptor, name = tempfile.mkstemp(prefix=".elablink-", suffix=".part", dir=destination.parent)
+        temporary = Path(name)
+        response = None
+        complete = False
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                response = self.api.uploads.read_upload(
+                    self.entity_type, self.ID, int(file_id), format="binary", _preload_content=False,
+                )
+                headers = response.headers
+                encoded = str(headers.get("Content-Encoding") or "identity").lower() != "identity"
+                try:
+                    length = int(headers["Content-Length"]) if not encoded else None
+                except (KeyError, ValueError, TypeError):
+                    length = None
+                done = 0
+                while True:
+                    block = response.read(1024 * 1024, decode_content=True)
+                    if not block:
+                        break
+                    output.write(block)
+                    done += len(block)
+                if length is not None and length >= 0 and done != length:
+                    raise OSError(f"Incomplete download; expected {length} bytes, received {done}.")
+                complete = True
+            os.replace(temporary, destination)
+            return destination
+        finally:
+            try:
+                if response is not None:
+                    try:
+                        if not complete:
+                            response.close()
+                    finally:
+                        response.release_conn()
+            finally:
+                temporary.unlink(missing_ok=True)
 
     def add_step(self, text: str, *, checked: bool = False) -> Step:
         """Append a step, optionally check its box, and return that exact step."""
@@ -383,20 +478,27 @@ class Experiment:
         )
 
     def _update_step(self, row: Any, checked: bool) -> Step:
+        step_id = int(self._get_attr(row, "id"))
         if self._step_status(row) != checked:
             self.api.steps.patch_step(
                 self.entity_type,
                 self.ID,
-                int(self._get_attr(row, "id")),
+                step_id,
                 body={"action": "finish"},
             )
             self._load()
-        return Step(
-            int(self._get_attr(row, "id")),
-            self._get_attr(row, "body", ""),
-            checked,
-            self._set_step_status,
-        )
+            confirmed = self.steps_by_id.get(step_id)
+            if confirmed is None:
+                raise KeyError(f"Step {step_id} disappeared while updating its checkbox")
+            if confirmed.status != checked:
+                state = "checked" if confirmed.status else "unchecked"
+                raise RuntimeError(
+                    f"Could not confirm the checkbox update for step {step_id}: "
+                    f"it is currently {state}. It may have changed concurrently; "
+                    "refresh before trying again."
+                )
+            return confirmed
+        return self._step(row)
 
     def _set_step_status(self, step_id: int, checked: bool) -> Step:
         return self.check_step(step_id, checked=checked)
@@ -713,11 +815,31 @@ class Experiment:
         return {"type": field_type, "value": value}
 
     def set_extra_fields(self, fields: Mapping[str, Any], *, merge: bool = True):
-        """Create or update eLabFTW custom fields in the metadata payload."""
+        """Create or update custom fields, fetching current metadata before merging.
+
+        Plain values preserve existing field settings; explicit definitions update
+        the settings supplied. ``merge=False`` replaces the metadata payload.
+        """
+        if not isinstance(fields, Mapping):
+            raise TypeError("Custom fields must be a mapping of names to values")
+        if merge:
+            self.refresh()
         metadata = self.metadata if merge else {}
-        extra_fields = dict(metadata.get("extra_fields") or {})
+        extra_fields = metadata.get("extra_fields", {})
+        if not isinstance(extra_fields, Mapping) or any(
+            not isinstance(field, Mapping) for field in extra_fields.values()
+        ):
+            raise ValueError("eLabFTW extra_fields must be an object of field definitions")
+        extra_fields = {name: dict(field) for name, field in extra_fields.items()}
         for name, value in fields.items():
-            extra_fields[str(name)] = self._extra_field(value)
+            name = str(name)
+            field = self._extra_field(value)
+            if name in extra_fields:
+                if not (isinstance(value, dict) and "value" in value):
+                    field = {"value": field["value"]}
+                extra_fields[name].update(field)
+            else:
+                extra_fields[name] = field
         metadata["extra_fields"] = extra_fields
         self.metadata = metadata
 

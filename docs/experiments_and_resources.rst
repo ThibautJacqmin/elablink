@@ -38,6 +38,7 @@ Edit properties and custom fields
 ``started_on`` (also named ``date``) is the editable date, not the creation
 timestamp. ``add_step()`` creates a step; assigning its ``status`` checks or
 unchecks an existing step. Repeated step names can be accessed through ``steps_by_id``.
+A checkbox update raises an error if the server does not confirm the requested state.
 
 The corresponding readable properties include:
 
@@ -51,7 +52,8 @@ The corresponding readable properties include:
 
 ``experiment.refresh()`` reloads record properties changed in the browser.
 Category and status choices are fetched when queried. Custom fields are part of ``metadata``;
-``set_extra_fields()`` merges the supplied fields by default.
+``set_extra_fields()`` fetches current metadata before merging and preserves
+existing field settings, such as units and dropdown choices.
 
 Create a resource
 -----------------
@@ -92,6 +94,8 @@ Load a record instead of creating another
 Use your real record IDs. You can also load by exact ``title="..."``. The client
 offers ``create_experiment(...)`` and ``create_resource(...)`` if you want to
 reuse one configured connection for several records.
+If several records share a title, eLabLink lists their IDs and asks you to load
+one explicitly with ``ID=...``.
 
 .. code-block:: python
 
@@ -114,6 +118,46 @@ integer ID. To use an existing experiment template:
    )
 
 There is no resource-template helper.
+
+Transfer ownership
+------------------
+
+Use an existing eLabFTW user ID to transfer an experiment or resource:
+
+.. code-block:: python
+
+   experiment.transfer_ownership(user_id=9)
+   print(experiment.owner_id)
+
+The destination defaults to the client's current team. Pass ``team_id=...``
+explicitly for another destination team. The server checks membership and
+your permission to transfer. A person's name without an account cannot be
+used as the owner. An archived account remains an account; eligibility is
+checked by the server.
+
+You can also choose the owner when creating an experiment, including from
+a template:
+
+.. code-block:: python
+
+   experiment = client.create_experiment("Calibration", owner_id=9)
+   experiment = client.create_experiment_from_template(
+       "Calibration", "Your template name", owner_id=9
+   )
+
+``owner_id`` and ``team_id`` are optional keyword-only arguments. Creation
+sets the title and category first, then transfers ownership. To add text,
+attachments or other content before handing over, create the experiment
+without ``owner_id``, populate it, and call ``transfer_ownership()`` last.
+Transferring may remove your read or write access.
+
+Ownership is checked by reading back the record. If the transfer request
+succeeds but read access is lost or the returned owner/team differs,
+``OwnershipTransferError`` reports the record ID. Creation also raises this
+error if its final transfer fails; the experiment has already been created
+and is not deleted or automatically recreated. Inspect ``error.entity_id``
+and its current owner before retrying. Direct transfer requests rejected by
+the server propagate the API exception. There are no automatic retries.
 
 Attach a file
 -------------

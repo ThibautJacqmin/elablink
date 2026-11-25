@@ -28,6 +28,8 @@ Copy ``elablink.conf.example`` to ``elablink.conf`` in the project root or in an
    VERIFY_SSL=true
    TEAM_ID=1
 
+Use HTTPS. ``VERIFY_SSL`` accepts only ``true`` or ``false``. An HTTP server
+requires an explicit ``ALLOW_INSECURE_HTTP=true`` setting.
 
 With ``UNIQUE_EXPERIMENTS_TITLES=true``, creating another experiment with the same exact title raises ``DuplicateTitle``  
 

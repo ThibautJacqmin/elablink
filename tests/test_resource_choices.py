@@ -33,7 +33,7 @@ class ResourceChoiceTests(unittest.TestCase):
             patch("elablink.client.resolve_config_path", return_value=Path("unused.conf")),
             patch.object(Client, "_read_configuration_file", return_value={}),
             patch.object(Client, "_api_configuration", new=configure),
-            patch("elablink.client.ep.ItemsTypesResourcesTemplatesApi") as category_api,
+            patch("elablink.client.ep.ItemsTypesResourcesTemplatesApi", create=True) as category_api,
         ):
             client = Client()
 

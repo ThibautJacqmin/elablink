@@ -135,8 +135,9 @@ Reanalyse an earlier measurement
    aqm.save_fig(name="reanalysis.png")
 
 Use a real local file path. Saving the figure queues an updated checkpoint even
-when this manager did not acquire the data. By default, the data folder's name
-selects the experiment.
+when this manager did not acquire the data. Known files keep their original
+experiment, even when this manager uses another data directory. If no saved
+association exists, the data folder's name selects the experiment.
 
 To start from eLabFTW instead, use the experiment ID and exact attachment filename
 shown on your server. In a new session, with the usual imports:

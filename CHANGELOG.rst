@@ -1,6 +1,31 @@
 eLabLink release notes
 =====================
 
+Unreleased
+----------
+
+* Transfer experiments and resources to an existing eLabFTW user and verify the
+  new owner and team. Experiment creation, including creation from templates,
+  accepts an optional owner. If a transfer fails after creation, its exception
+  includes the created experiment ID.
+* Report all matching record IDs when a title lookup is ambiguous.
+* Fetch current metadata before updating extra fields and retain existing field
+  settings, including units and choices. Verify checkbox updates against the
+  server and report conflicting edits.
+* Remember the original experiment for an H5 acquisition opened from another
+  analysis project. New uploads write a portable association beside the H5 file.
+  Older files can use the original data directory's index.
+* Configure background file upload timeouts independently of other API requests.
+  Protect acquisition snapshots against linked files and keep sensitive HTTP
+  response details out of background error reports.
+* Stream attachment downloads to a temporary file and replace the destination
+  only when the transfer completes.
+* Accept both naming conventions for category and status APIs in supported
+  elabapi-python 6 versions.
+* Require HTTPS unless the configuration explicitly enables plain HTTP with
+  ``ALLOW_INSECURE_HTTP=true``. Certificate verification settings accept
+  ``true`` or ``false``.
+
 0.1.1
 -----
 

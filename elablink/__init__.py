@@ -13,6 +13,7 @@ from .experiment import Experiment
 from .resource import Resource
 from .step import Step
 from .exceptions import (
+    AmbiguousTitle,
     DeletedExperiment,
     DuplicateTitle,
     ELabError,
@@ -22,6 +23,7 @@ from .exceptions import (
     InvalidTag,
     InvalidTemplate,
     InvalidTitle,
+    OwnershipTransferError,
 )
 
 __all__ = [
@@ -33,6 +35,7 @@ __all__ = [
     "Experiment",
     "Resource",
     "Step",
+    "AmbiguousTitle",
     "DeletedExperiment",
     "DuplicateTitle",
     "ELabError",
@@ -42,6 +45,7 @@ __all__ = [
     "InvalidTag",
     "InvalidTemplate",
     "InvalidTitle",
+    "OwnershipTransferError",
 ]
 
 __version__ = "0.1.1"

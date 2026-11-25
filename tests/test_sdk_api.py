@@ -71,6 +71,39 @@ class SDKContractTests(unittest.TestCase):
         self.assertEqual(self.request.call_args.args[:2], ("/experiments", "POST"))
         self.assertEqual(self.request.call_args.kwargs["body"], {"title": "Measurement"})
 
+    def test_ownership_transfer_uses_generated_patch_then_reads_back(self):
+        self.request.return_value = SimpleNamespace(
+            to_dict=lambda: {"id": 17, "userid": 9, "team": 4}
+        )
+        for entity_type, endpoint in (
+            (Experiment, "/experiments/{id}"), (Resource, "/items/{id}"),
+        ):
+            with self.subTest(entity=entity_type.__name__):
+                self.request.reset_mock()
+                entity = entity_type(self.client, 17)
+                entity.transfer_ownership(9)
+                transfer, refresh = self.request.call_args_list
+                self.assertEqual(transfer.args[:3], (endpoint, "PATCH", {"id": 17}))
+                self.assertEqual(transfer.kwargs["body"],
+                                 {"action": "updateowner", "userid": 9, "team": 4})
+                self.assertEqual(refresh.args[:3], (endpoint, "GET", {"id": 17}))
+                self.assertEqual(entity.owner_id, 9)
+
+    def test_creation_with_owner_posts_transfers_then_verifies(self):
+        self.request.side_effect = [
+            (None, None, {"Location": "/api/v2/experiments/17"}),
+            None,
+            SimpleNamespace(to_dict=lambda: {"id": 17, "userid": 9, "team": 4}),
+        ]
+        experiment = self.client.create_experiment("Measurement", owner_id=9)
+        create, transfer, refresh = self.request.call_args_list
+        self.assertEqual(create.args[:2], ("/experiments", "POST"))
+        self.assertEqual(create.kwargs["body"], {"title": "Measurement"})
+        self.assertEqual(transfer.kwargs["body"],
+                         {"action": "updateowner", "userid": 9, "team": 4})
+        self.assertEqual(refresh.args[:3], ("/experiments/{id}", "GET", {"id": 17}))
+        self.assertEqual(experiment.owner_id, 9)
+
     def test_attachment_operations_keep_their_exact_record_and_upload_ids(self):
         self.request.return_value = None
         uploads = self.client.uploads
