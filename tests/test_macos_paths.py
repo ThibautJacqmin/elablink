@@ -30,7 +30,7 @@ class MacStoragePathTests(unittest.TestCase):
                     self.assertEqual(absolute_storage_path(path), path)
         self.assertEqual(absolute_storage_path("/etc/example"), Path("/etc/example"))
 
-    def test_acquisitions_working_folders_and_confirmed_saves_under_tmp(self):
+    def test_acquisition_under_tmp_preserves_nested_link_protection(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:
             root = Path(directory)
             data = root / "run.h5"
@@ -50,17 +50,24 @@ class MacStoragePathTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "symbolic links"):
                     bridge.enqueue(SimpleNamespace(filepath=link / "other.h5"))
 
-                client = FakeClient()
-                store = AttachmentStore(None, "experiments", 1, root / "cache",
-                                        lambda: client, folder=resolve_browser_folder(folder))
-                row = client.add("result.txt", b"download")
-                output = folder / "result.txt"
-                output.write_bytes(b"replace")
-                self.assertEqual(store.save_files({row["id"]: output}, overwrite=[output.resolve()]),
-                                 [output.resolve()])
-                self.assertEqual(output.read_bytes(), b"download")
-                with self.assertRaisesRegex(ValueError, "symbolic links"):
-                    store.set_folder(resolve_browser_folder(link))
-                with self.assertRaisesRegex(ValueError, "symbolic link"):
-                    store.save_files({row["id"]: link / "unexpected.txt"})
-                self.assertFalse((folder / "unexpected.txt").exists())
+    def test_working_folders_and_confirmed_saves_under_tmp(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            root = Path(directory)
+            folder = root / "working"
+            folder.mkdir()
+            link = root / "linked"
+            link.symlink_to(folder, target_is_directory=True)
+            client = FakeClient()
+            store = AttachmentStore(None, "experiments", 1, root / "cache",
+                                    lambda: client, folder=resolve_browser_folder(folder))
+            row = client.add("result.txt", b"download")
+            output = folder / "result.txt"
+            output.write_bytes(b"replace")
+            self.assertEqual(store.save_files({row["id"]: output}, overwrite=[output.resolve()]),
+                             [output.resolve()])
+            self.assertEqual(output.read_bytes(), b"download")
+            with self.assertRaisesRegex(ValueError, "symbolic links"):
+                store.set_folder(resolve_browser_folder(link))
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                store.save_files({row["id"]: link / "unexpected.txt"})
+            self.assertFalse((folder / "unexpected.txt").exists())

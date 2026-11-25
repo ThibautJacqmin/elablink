@@ -3,7 +3,7 @@ Experimental attachment browser
 
 The attachment browser is an optional desktop window for finding experiments
 and resources and managing their files. It is **experimental** in eLabLink
-0.2.0a1 and has less testing than the core Python API. The browser has been
+0.3.0a1 and has less testing than the core Python API. The browser has been
 exercised on Windows against a live eLabFTW server and with offline
 experiment and resource records on Ubuntu 24.04 under WSLg, using both
 Wayland and X11. The installed launcher and single-click navigation were
@@ -20,7 +20,7 @@ Before installing
 * Use a computer with a graphical desktop and Python 3.10 or newer. The
   examples use a dedicated Python environment so you can try the alpha
   alongside an existing stable eLabLink installation.
-* Obtain ``elablink-0.2.0a1-py3-none-any.whl`` from the maintainer or from
+* Obtain ``elablink-0.3.0a1-py3-none-any.whl`` from the maintainer or from
   the published prerelease's **Assets** on `GitHub Releases
   <https://github.com/ThibautJacqmin/eLabLink/releases>`_. Save it in your
   **Downloads** folder. Windows, macOS and Linux use the same eLabLink wheel.
@@ -74,7 +74,7 @@ Windows installation and first launch
       $browserDir = Join-Path $HOME 'eLabLink Browser'
       py -3 -m venv "$browserDir\venv"
       Set-Location -LiteralPath "$HOME\Downloads"
-      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.2.0a1-py3-none-any.whl[browser]"
+      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a1-py3-none-any.whl[browser]"
 
 2. Run ``notepad "$browserDir\elablink.conf"``. Paste the configuration
    above, fill in your values and save. If **Save As** opens, choose
@@ -164,7 +164,7 @@ separately (for example, ``python3-venv`` on Debian and Ubuntu).
    browser_dir="$HOME/eLabLink Browser"
    python3 -m venv "$browser_dir/venv"
    cd "$HOME/Downloads"
-   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.2.0a1-py3-none-any.whl[browser]"
+   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a1-py3-none-any.whl[browser]"
 
 Create the private config in a plain-text editor. For example, run these
 commands, paste the configuration shown above, and in ``nano`` press

@@ -424,9 +424,8 @@ class AsyncBridge:
         )
         result = self._experiment_info(experiment, snapshot.experiment_name)
         if original is not None:
-            # The stable checkpoint can still upload if the original was removed.
-            if original.is_file():
-                write_source_manifest(original, source)
+            # Labmate can replace the local H5 after the checkpoint has uploaded.
+            write_source_manifest(original, source, missing_ok=True)
             remember_source(original, source, self._analysis_directory)
         self._remove_snapshot(directory)
         return result

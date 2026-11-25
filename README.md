@@ -106,7 +106,7 @@ See the [release notes](CHANGELOG.rst) for compatibility and known limitations.
 
 ## Experimental desktop attachment browser
 
-The optional browser in **0.2.0a1** lets you search experiments and resources
+The optional browser in **0.3.0a1** lets you search experiments and resources
 and manage their attached files from a desktop window. It is under active
 development and has had less testing than the core Python interface.
 Install the `browser` extra to try it. The guide covers Windows shortcuts,
