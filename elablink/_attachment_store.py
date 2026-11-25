@@ -16,6 +16,7 @@ import threading
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode
 
+from ._paths import absolute_storage_path
 from .client import Client
 from .config import browser_storage_directory
 from .remote_analysis import RemoteSource, check_source_manifest, read_source, write_source_manifest
@@ -113,7 +114,7 @@ class AttachmentStore:
             return self.folder_info()
         if not str(folder).strip():
             raise ValueError("Choose a non-empty working folder path")
-        path = Path(folder).expanduser().absolute()
+        path = absolute_storage_path(folder)
         for part in (path, *path.parents):
             if part.is_symlink() or _junction(part):
                 raise ValueError("The working folder cannot contain symbolic links or junctions")
@@ -567,9 +568,9 @@ class AttachmentStore:
         """
         _cancelled(cancel)
         rows = self._selected({"id": identifier} for identifier in destinations)
-        targets = {int(identifier): Path(path).expanduser().absolute()
+        targets = {int(identifier): absolute_storage_path(path)
                    for identifier, path in destinations.items()}
-        approved = {Path(path).expanduser().absolute() for path in overwrite}
+        approved = {absolute_storage_path(path) for path in overwrite}
         if not approved.issubset(targets.values()):
             raise ValueError("Overwrite approval must refer to a selected destination")
         if len({str(path.resolve()).casefold() for path in targets.values()}) != len(targets):

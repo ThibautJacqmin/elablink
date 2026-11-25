@@ -32,6 +32,7 @@ from ._attachment_preview_qt import IMAGE_PREVIEW_SUFFIXES, PREVIEW_SUFFIXES, Pr
 from ._attachment_record_picker_qt import RecordPicker
 from ._attachment_store import AttachmentStore
 from .attachment_browser import open_h5viewer, open_klayout
+from ._paths import absolute_storage_path
 from .config import resolve_browser_folder, resolve_config_path
 from .exceptions import safe_error_message
 
@@ -403,7 +404,7 @@ class AttachmentBrowser(QMainWindow):
         self._preview_row = None
         self._preview_page = 0
         self._archive_path = None
-        self._folder = Path(folder).expanduser().resolve() if folder is not None else None
+        self._folder = absolute_storage_path(folder) if folder is not None else None
         self._config_path = config_path
         self._cache_directory = cache_directory
         self._record = (entity_type, entity_id) if entity_id is not None else None

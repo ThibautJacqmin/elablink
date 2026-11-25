@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 import tempfile
 
+from ._paths import absolute_storage_path
+
 try:
     import tomllib
 except ModuleNotFoundError:  # Python 3.10
@@ -100,7 +102,7 @@ def resolve_browser_folder(folder: str | Path | None = None) -> Path | None:
     if folder is not None:
         if not str(folder).strip():
             raise ValueError("Choose a non-empty browser folder path")
-        path = Path(folder).expanduser().resolve()
+        path = absolute_storage_path(folder)
         if path.exists() and not path.is_dir():
             raise NotADirectoryError(path)
         return path
