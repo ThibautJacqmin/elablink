@@ -9,4 +9,5 @@ prune docs/_build
 global-exclude *.pyc *.pyo
 global-exclude *-checkpoint.*
 recursive-include tests *.py
+recursive-include tools/windows_installer *.py *.cmd
 

@@ -12,6 +12,7 @@ on:
       - 'examples/**'
       - 'pyproject.toml'
       - 'setup.py'
+      - 'tools/windows_installer/**'
 
 permissions:
   contents: read
@@ -93,6 +94,8 @@ jobs:
           fixture_dir="$RUNNER_TEMP/browser-wheel-tests"
           mkdir -p "$fixture_dir"
           cp -R tests examples "$fixture_dir/"
+          mkdir -p "$fixture_dir/tools"
+          cp -R tools/windows_installer "$fixture_dir/tools/"
           cd "$fixture_dir"
           export PYTHONPATH="$(python -c "import os; from pathlib import Path; root = Path.cwd(); print(os.pathsep.join(map(str, [root, root / 'tests'])))")"
           python -c "import elablink, sys; from pathlib import Path; assert Path(elablink.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()), elablink.__file__"

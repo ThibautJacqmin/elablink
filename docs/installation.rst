@@ -1,27 +1,46 @@
 Installation and configuration
 ==============================
 
-You need Python 3.10 or newer, an eLabFTW server, and an API key that can edit
-your experiments and resources. You can generate an API key from the eLabFTW interface.
+Choose one installation for your workflow. Both support Python 3.10 or newer.
 
-Install eLabLink
-----------------
+1. **Python wrapper only (stable v0.2.0).** Follow the instructions below
+   to install the API for scripts and notebooks in your project environment.
+2. **Python wrapper + Attachment Browser (experimental v0.3.0a2).** Go
+   straight to :doc:`attachment_browser`. Its setup includes the wrapper,
+   Qt and PDF preview support in a dedicated environment.
 
-From the eLabLink project folder, in the Python environment you use:
+Install the Python wrapper only
+-------------------------------
+
+Use the Python environment that runs your scripts or notebooks. On Windows,
+macOS and Linux, this command installs core v0.2.0 and its API dependencies
+from the `stable GitHub release <https://github.com/ThibautJacqmin/elablink/releases/tag/v0.2.0>`_.
+
+.. code-block:: console
+
+   python -m pip install "https://github.com/ThibautJacqmin/elablink/releases/download/v0.2.0/elablink-0.2.0-py3-none-any.whl"
+
+To check which version that environment uses:
+
+.. code-block:: console
+
+   python -c "from importlib.metadata import version; print(version('elablink'))"
+
+For an editable development install, run this from the eLabLink project folder:
 
 .. code-block:: console
 
    python -m pip install --use-pep517 -e .
 
-``-e`` selects editable, or developer, mode: changes to this checkout are used without reinstalling the package. 
-
-For the optional experimental desktop browser, see :doc:`attachment_browser`
-for the prerelease installation and desktop shortcut instructions.
+``-e`` selects editable mode. Edits to the checkout take effect the next time Python loads the package.
 
 Create your configuration
 -------------------------
 
-Copy ``elablink.conf.example`` to ``elablink.conf`` in the project root or in another folder of your choice, and fill in your server address and API key:
+Download the `example configuration <https://github.com/ThibautJacqmin/elablink/blob/v0.2.0/elablink.conf.example>`_
+(or copy it from your checkout) and save it as ``elablink.conf``.
+Enter your server address and a personal API key from eLabFTW. A read-only
+key is sufficient for reading records. Editing requires a write-enabled key.
 
 .. code-block:: ini
 

@@ -4,7 +4,19 @@
 
 Work with your eLabFTW notebook from Python.
 
-[Documentation](https://elablink.readthedocs.io)
+## Choose your installation
+
+1. **Python wrapper only (stable v0.2.0).** For scripts and notebooks, run this in your Python 3.10+ project environment on Windows, macOS or Linux.
+
+   ```console
+   python -m pip install "https://github.com/ThibautJacqmin/elablink/releases/download/v0.2.0/elablink-0.2.0-py3-none-any.whl"
+   ```
+
+   [Configure the Python wrapper](docs/installation.rst)
+
+2. **Python wrapper + Attachment Browser (experimental v0.3.0a2).** Choose this to search eLabFTW records and manage attachments in a desktop window. One setup installs both in a dedicated Python environment. On Windows x64, extract the ZIP and double-click `Install-eLabLink-Attachment-Browser.cmd`. On macOS or Linux, use the wheel and the platform instructions. [Windows setup ZIP](https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a2/eLabLink-Attachment-Browser-Setup-0.3.0a2-Windows-x64.zip) · [Browser setup for all platforms](docs/attachment_browser.rst)
+
+## Using the Python wrapper
 
 eLabLink turns familiar eLabFTW concepts into Python objects: an `Experiment`
 for an experiment, a `Resource` for a sample or instrument, and properties and
@@ -79,9 +91,9 @@ needed in measurement code. See the
 - [Labmate script](examples/labmate_acquisition.py): the same workflow in Python,
   including access to the eLabFTW experiment.
 
-## Installation and documentation
+## Development and documentation
 
-From this checkout, in the Python environment you use:
+For an editable development install from this checkout:
 
 ```console
 python -m pip install --use-pep517 -e .
@@ -91,7 +103,7 @@ Python 3.10 or newer is required. Labmate is optional for the direct eLabFTW
 interface; the acquisition guides explain its installation. In a notebook,
 use `%pip` in the kernel's environment and restart the kernel after installing.
 
-The documentation is configured for Read the Docs. Build it locally with
+The [documentation](https://elablink.readthedocs.io) is hosted on Read the Docs. Build it locally with
 Python 3.12:
 
 ```console
@@ -109,8 +121,6 @@ See the [release notes](CHANGELOG.rst) for compatibility and known limitations.
 The optional browser in **0.3.0a2** lets you search experiments and resources
 and manage their attached files from a desktop window. It is under active
 development and has had less testing than the core Python interface.
-Install the `browser` extra to try it. The guide covers Windows shortcuts,
-macOS launchers, Linux desktop entries, and connecting to your server.
 [Attachment browser setup and usage](docs/attachment_browser.rst)
 
 ## Author and acknowledgements
