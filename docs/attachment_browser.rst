@@ -1,9 +1,11 @@
 Experimental attachment browser
 ===============================
 
-The attachment browser is an optional desktop window for finding experiments
-and resources and managing their files. It is **experimental** in eLabLink
-0.3.0a2 and has less testing than the core Python API. The browser has been
+This guide installs the **Python wrapper + Attachment Browser** together.
+For the stable **Python wrapper only**, see :doc:`installation`.
+
+Use the desktop window to find experiments and resources and manage their files. It is **experimental** in eLabLink
+0.3.0a3 and has less testing than the core Python API. The browser has been
 exercised on Windows against a live eLabFTW server and with offline
 experiment and resource records on Ubuntu 24.04 under WSLg, using both
 Wayland and X11. The installed launcher and single-click navigation were
@@ -17,12 +19,14 @@ below still needs a manual check on a Mac.
 Before installing
 -----------------
 
-* Use a computer with a graphical desktop and Python 3.10 or newer. The
-  examples use a dedicated Python environment so you can try the alpha
-  alongside an existing stable eLabLink installation.
-* Obtain ``elablink-0.3.0a2-py3-none-any.whl`` from the maintainer or from
-  the published prerelease's **Assets** on `GitHub Releases
-  <https://github.com/ThibautJacqmin/eLabLink/releases>`_. Save it in your
+* Start with a graphical desktop and Python 3.10 or newer. Browser setup
+  installs the eLabLink core library, Qt and PDF preview support together
+  in a dedicated environment. You can start on a computer that has never
+  had eLabLink installed. The optional Labmate acquisition dependencies are
+  a separate extra.
+* Windows x64 users can use the setup ZIP described below. For manual
+  installation on any platform, download the `v0.3.0a3 browser wheel
+  <https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a3/elablink-0.3.0a3-py3-none-any.whl>`_. Save it in your
   **Downloads** folder. Windows, macOS and Linux use the same eLabLink wheel.
   During installation pip downloads the matching Qt and PDF libraries for
   your operating system, Python version and processor.
@@ -58,8 +62,34 @@ Keep this file in your personal account. The desktop launchers below store
 only its **path**. On a shared computer, each person should create a
 configuration and shortcut under their own login.
 
-Windows installation and first launch
--------------------------------------
+Windows double-click installer
+------------------------------
+
+1. Download the `Windows x64 setup ZIP
+   <https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a3/eLabLink-Attachment-Browser-Setup-0.3.0a3-Windows-x64.zip>`_.
+   The installer needs internet access and 64-bit Python 3.10
+   or newer for Windows x64. It also supports Anaconda and Miniconda.
+2. In File Explorer, right-click the ZIP, choose **Extract All**, then
+   double-click **Install-eLabLink-Attachment-Browser.cmd** in the extracted folder. Keep the
+   helper files and wheel together. With a custom Conda installation, you
+   can also run the same file from **Anaconda Prompt**.
+3. Follow the prompts to use your existing configuration or enter your
+   HTTPS server address and personal API key. Setup installs eLabLink and
+   its Qt and PDF dependencies in a private environment and checks that Qt
+   6.12.1 actually loads before creating the desktop shortcut.
+4. Open **eLabLink Attachment Browser** using the shortcut reported by setup.
+   For a later release, extract its ZIP and run its launcher. Setup
+   checks the new installation before replacing a managed shortcut.
+   Setup can reuse the configuration from an older **eLabLink Attachments**
+   shortcut. The new shortcut is named **eLabLink Attachment Browser**.
+   Previously installed environments are kept for recovery.
+
+The installer is for the attachment browser. KLayout and the optional
+H5viewer application are separate installations. Keep an existing browser
+environment if you use its H5viewer integration.
+
+Windows manual installation and first launch
+--------------------------------------------
 
 1. Open **PowerShell**. These steps use standard Python from python.org.
    A clean Windows installation was tested with 64-bit CPython 3.12.10.
@@ -74,7 +104,7 @@ Windows installation and first launch
       $browserDir = Join-Path $HOME 'eLabLink Browser'
       py -3 -m venv "$browserDir\venv"
       Set-Location -LiteralPath "$HOME\Downloads"
-      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a2-py3-none-any.whl[browser]"
+      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a3-py3-none-any.whl[browser]" "PyQt6==6.12.1" "PyQt6-Qt6==6.12.1"
 
 2. Run ``notepad "$browserDir\elablink.conf"``. Paste the configuration
    above, fill in your values and save. If **Save As** opens, choose
@@ -110,7 +140,7 @@ browser.
 
 2. Right-click a blank area of the desktop, choose **New → Shortcut**,
    paste **Target** into **Type the location of the item**, choose **Next**,
-   name it **eLabLink Attachments**, and choose **Finish**.
+   name it **eLabLink Attachment Browser**, and choose **Finish**.
 3. Right-click the new or copied shortcut and open **Properties → Shortcut**.
    Set **Target** and **Start in** from step 1. Keep the executable path and
    the config path individually quoted in **Target**. **Start in** contains
@@ -154,9 +184,14 @@ the shortcut format.
 macOS and Linux installation and first launch
 ---------------------------------------------
 
-Open a local **Terminal**. Check the version and install the wheel with
-the ``browser`` extra. On Linux, your distribution may package ``venv``
-separately (for example, ``python3-venv`` on Debian and Ubuntu).
+Open **Terminal** and install the release wheel with its ``browser`` extra.
+The commands below select the same Qt 6.12.1 runtime as the Windows setup
+ZIP. Its prebuilt wheels support macOS 14+ on Intel and Apple Silicon, and
+Linux with glibc 2.34+ on x86-64 or 2.39+ on ARM64. On Linux, your
+distribution may package ``venv`` separately (for example,
+``python3-venv`` on Debian and Ubuntu). See the
+`PyQt6 wheels <https://pypi.org/project/PyQt6/6.12.1/#files>`_ and
+`Qt runtime wheels <https://pypi.org/project/PyQt6-Qt6/6.12.1/#files>`_.
 
 .. code-block:: sh
 
@@ -164,7 +199,9 @@ separately (for example, ``python3-venv`` on Debian and Ubuntu).
    browser_dir="$HOME/eLabLink Browser"
    python3 -m venv "$browser_dir/venv"
    cd "$HOME/Downloads"
-   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a2-py3-none-any.whl[browser]"
+   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a3-py3-none-any.whl[browser]" \
+       "PyQt6==6.12.1" "PyQt6-Qt6==6.12.1"
+   "$browser_dir/venv/bin/python" -c "from PyQt6.QtCore import qVersion; print(qVersion())"
 
 Create the private config in a plain-text editor. For example, run these
 commands, paste the configuration shown above, and in ``nano`` press
@@ -196,7 +233,7 @@ macOS Finder and Dock launcher
 
       exec "$HOME/eLabLink Browser/venv/bin/elablink-attachments" --config-path "$HOME/eLabLink Browser/elablink.conf"
 
-3. Choose **File → Save**, name it **eLabLink Attachments** and save it on
+3. Choose **File → Save**, name it **eLabLink Attachment Browser** and save it on
    your Desktop. Double-click the application in Finder. You can also drag
    it onto the applications side of your Dock.
 4. If the environment or config moves, open the saved application in
@@ -221,14 +258,14 @@ allow spaces in directory names.
    cat > "$menu_dir/elablink-attachments.desktop" <<EOF
    [Desktop Entry]
    Type=Application
-   Name=eLabLink Attachments
+   Name=eLabLink Attachment Browser
    Comment=Browse eLabFTW experiment and resource files
    Exec="$HOME/eLabLink Browser/venv/bin/elablink-attachments" --config-path "$HOME/eLabLink Browser/elablink.conf"
    Terminal=false
    Categories=Science;
    EOF
 
-Open the applications menu, search for **eLabLink Attachments**, and launch
+Open the applications menu, search for **eLabLink Attachment Browser**, and launch
 it. To change the config or move the environment, edit the generated
 ``elablink-attachments.desktop`` in a plain-text editor. Use literal
 absolute paths in the saved ``Exec=`` line, such as

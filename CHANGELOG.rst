@@ -1,6 +1,19 @@
 eLabLink release notes
 =====================
 
+0.3.0a3 (prerelease)
+--------------------
+
+* A Windows x64 setup ZIP installs the Python wrapper and experimental
+  Attachment Browser together in a dedicated environment, checks Qt and
+  PDF support, and creates an **eLabLink Attachment Browser** desktop
+  shortcut. It supports standard Python and Conda and can reuse the
+  configuration from a previous browser shortcut.
+* The installation guides open with two choices: the stable Python wrapper
+  for scripts and notebooks, or the wrapper and experimental browser
+  together. The macOS and Linux guide covers installation from the wheel
+  and setting up a desktop launcher.
+
 0.3.0a2 (prerelease)
 --------------------
 
