@@ -14,7 +14,7 @@ Work with your eLabFTW notebook from Python.
 
    [Configure the Python wrapper](docs/installation.rst)
 
-2. **Python wrapper + Attachment Browser (experimental v0.3.0a2).** Choose this to search eLabFTW records and manage attachments in a desktop window. One setup installs both in a dedicated Python environment. On Windows x64, extract the ZIP and double-click `Install-eLabLink-Attachment-Browser.cmd`. On macOS or Linux, use the wheel and the platform instructions. [Windows setup ZIP](https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a2/eLabLink-Attachment-Browser-Setup-0.3.0a2-Windows-x64.zip) · [Browser setup for all platforms](docs/attachment_browser.rst)
+2. **Python wrapper + Attachment Browser (experimental v0.3.0a3).** Choose this to search eLabFTW records and manage attachments in a desktop window. One setup installs both in a dedicated Python environment. On Windows x64, extract the ZIP and double-click `Install-eLabLink-Attachment-Browser.cmd`. On macOS or Linux, use the wheel and the platform instructions. [Windows setup ZIP](https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a3/eLabLink-Attachment-Browser-Setup-0.3.0a3-Windows-x64.zip) · [Browser setup for all platforms](docs/attachment_browser.rst)
 
 ## Using the Python wrapper
 
@@ -118,7 +118,7 @@ See the [release notes](CHANGELOG.rst) for compatibility and known limitations.
 
 ## Experimental desktop attachment browser
 
-The optional browser in **0.3.0a2** lets you search experiments and resources
+The optional browser in **0.3.0a3** lets you search experiments and resources
 and manage their attached files from a desktop window. It is under active
 development and has had less testing than the core Python interface.
 [Attachment browser setup and usage](docs/attachment_browser.rst)

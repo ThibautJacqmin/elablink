@@ -6,7 +6,7 @@ Choose your installation
 
 * **Python wrapper only (stable v0.2.0).** Use eLabFTW from scripts and
   notebooks in your existing Python environment. See :doc:`installation`.
-* **Python wrapper + Attachment Browser (experimental v0.3.0a2).** Browse
+* **Python wrapper + Attachment Browser (experimental v0.3.0a3).** Browse
   experiments, resources and their files from a desktop window. One setup
   installs both in a dedicated environment. See :doc:`attachment_browser`
   for the Windows setup ZIP and the macOS and Linux instructions.

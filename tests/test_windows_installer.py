@@ -27,7 +27,7 @@ class WindowsInstallerTests(unittest.TestCase):
         self.install_dir = self.root / "installed browser"
         self.desktop = self.root / "redirected desktop"
         self.desktop.mkdir()
-        self.wheel = self.root / "elablink-0.3.0a2-py3-none-any.whl"
+        self.wheel = self.root / "elablink-0.3.0a3-py3-none-any.whl"
         self.wheel.write_bytes(b"test release archive")
         self.config = self.root / "configuration with spaces" / "team.conf"
         self.config.parent.mkdir()

@@ -5,7 +5,7 @@ This guide installs the **Python wrapper + Attachment Browser** together.
 For the stable **Python wrapper only**, see :doc:`installation`.
 
 Use the desktop window to find experiments and resources and manage their files. It is **experimental** in eLabLink
-0.3.0a2 and has less testing than the core Python API. The browser has been
+0.3.0a3 and has less testing than the core Python API. The browser has been
 exercised on Windows against a live eLabFTW server and with offline
 experiment and resource records on Ubuntu 24.04 under WSLg, using both
 Wayland and X11. The installed launcher and single-click navigation were
@@ -25,8 +25,8 @@ Before installing
   had eLabLink installed. The optional Labmate acquisition dependencies are
   a separate extra.
 * Windows x64 users can use the setup ZIP described below. For manual
-  installation on any platform, download the `v0.3.0a2 browser wheel
-  <https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a2/elablink-0.3.0a2-py3-none-any.whl>`_. Save it in your
+  installation on any platform, download the `v0.3.0a3 browser wheel
+  <https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a3/elablink-0.3.0a3-py3-none-any.whl>`_. Save it in your
   **Downloads** folder. Windows, macOS and Linux use the same eLabLink wheel.
   During installation pip downloads the matching Qt and PDF libraries for
   your operating system, Python version and processor.
@@ -66,7 +66,7 @@ Windows double-click installer
 ------------------------------
 
 1. Download the `Windows x64 setup ZIP
-   <https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a2/eLabLink-Attachment-Browser-Setup-0.3.0a2-Windows-x64.zip>`_.
+   <https://github.com/ThibautJacqmin/elablink/releases/download/v0.3.0a3/eLabLink-Attachment-Browser-Setup-0.3.0a3-Windows-x64.zip>`_.
    The installer needs internet access and 64-bit Python 3.10
    or newer for Windows x64. It also supports Anaconda and Miniconda.
 2. In File Explorer, right-click the ZIP, choose **Extract All**, then
@@ -104,7 +104,7 @@ Windows manual installation and first launch
       $browserDir = Join-Path $HOME 'eLabLink Browser'
       py -3 -m venv "$browserDir\venv"
       Set-Location -LiteralPath "$HOME\Downloads"
-      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a2-py3-none-any.whl[browser]" "PyQt6==6.12.1" "PyQt6-Qt6==6.12.1"
+      & "$browserDir\venv\Scripts\python.exe" -m pip install ".\elablink-0.3.0a3-py3-none-any.whl[browser]" "PyQt6==6.12.1" "PyQt6-Qt6==6.12.1"
 
 2. Run ``notepad "$browserDir\elablink.conf"``. Paste the configuration
    above, fill in your values and save. If **Save As** opens, choose
@@ -199,7 +199,7 @@ distribution may package ``venv`` separately (for example,
    browser_dir="$HOME/eLabLink Browser"
    python3 -m venv "$browser_dir/venv"
    cd "$HOME/Downloads"
-   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a2-py3-none-any.whl[browser]" \
+   "$browser_dir/venv/bin/python" -m pip install "./elablink-0.3.0a3-py3-none-any.whl[browser]" \
        "PyQt6==6.12.1" "PyQt6-Qt6==6.12.1"
    "$browser_dir/venv/bin/python" -c "from PyQt6.QtCore import qVersion; print(qVersion())"
 

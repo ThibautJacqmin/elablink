@@ -5,7 +5,7 @@ Choose one installation for your workflow. Both support Python 3.10 or newer.
 
 1. **Python wrapper only (stable v0.2.0).** Follow the instructions below
    to install the API for scripts and notebooks in your project environment.
-2. **Python wrapper + Attachment Browser (experimental v0.3.0a2).** Go
+2. **Python wrapper + Attachment Browser (experimental v0.3.0a3).** Go
    straight to :doc:`attachment_browser`. Its setup includes the wrapper,
    Qt and PDF preview support in a dedicated environment.
 
